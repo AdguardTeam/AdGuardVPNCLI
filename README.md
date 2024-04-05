@@ -1,5 +1,30 @@
 # AdGuard VPN CLI
 
+<h3 align="center">Fast, flexible and reliable VPN solution for a command line interface</h3>
+
+<p align="center">
+  Your online safety and anonymity guaranteed by a trusted developer.
+</p>
+
+<p align="center">
+    <a href="https://adguard-vpn.com/">Website</a> |
+    <a href="https://reddit.com/r/Adguard">Reddit</a> |
+    <a href="https://twitter.com/AdGuard">Twitter</a> |
+    <a href="https://t.me/adguard_en">Telegram</a>
+    <br /><br />
+  <a
+    </a>
+    <a href="https://github.com/AdguardTeam/AdguardVPNForWindows/releases/">
+        <img src="https://img.shields.io/github/tag/AdguardTeam/AdGuardVPNCLI.svg?label=release" alt="Latest release" />
+    </a>
+    <a href="https://github.com/AdguardTeam/AdguardVPNForWindows/releases/">
+    <img src="https://img.shields.io/github/tag-pre/AdguardTeam/AdGuardVPNCLI.svg?label=beta" alt="Beta version>" />
+    </a>
+
+> ### Disclaimer
+>* AdGuard VPN CLI is not an open source project. We use GitHub as an open bug tracker for users to see what developers are working on. However, we at AdGuard create [a lot of open source software](https://github.com/search?o=desc&q=topic%3Aopen-source+org%3AAdguardTeam+fork%3Atrue&s=stars&type=Repositories).
+> * Privacy policy: https://adguard-vpn.com/privacy.html
+
 ## Overview
 
 AdGuard VPN CLI provides a command-line interface for managing VPN connection.
