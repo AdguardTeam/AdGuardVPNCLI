@@ -1,4 +1,9 @@
-# AdGuard VPN CLI
+<p align="center">
+<picture>
+<source media="(prefers-color-scheme: dark)" srcset="https://cdn.adguard.com/public/Adguard/Common/Logos/vpn_logo_dark_cli.svg" width="300px" alt="AdGuard VPN CLI" />
+<img src="https://cdn.adguard.com/public/Adguard/Common/Logos/vpn_logo_light_cli.svg?" width="300px" alt="AdGuard VPN CLI" />
+</picture>
+</p>
 
 <h3 align="center">Fast, flexible and reliable VPN solution for command-line enthusiasts</h3>
 
@@ -40,13 +45,13 @@ To install the latest version of AdGuard VPN CLI, run the following command:
 Just replace <update_channel> with one of the following values: release, beta, nightly
 
 ```shell
-curl -S -s -f -L https://static.adtidy.net/cli/<update_channel>/install.sh | sh -s -- -v
+curl -SsfL https://raw.githubusercontent.com/AdguardTeam/AdGuardVPNCLI/master/scripts/<update_channel>/install.sh | sh -s -- -v
 ```
 
 To install a specific version of AdGuard VPN CLI, run the following command:
 
 ```shell
-sh -c "$(curl -fsSL https://static.adtidy.net/cli/<update_channel>/install-<version_number>.sh)" install-<version_number>.sh -v
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/AdguardTeam/AdGuardVPNCLI/master/scripts/<update_channel>/install-<version_number>.sh)" install-<version_number>.sh -v
 ```
 
 ## Verify Releases
