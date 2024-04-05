@@ -14,10 +14,10 @@
     <br /><br />
   <a
     </a>
-    <a href="https://github.com/AdguardTeam/AdguardVPNForWindows/releases/">
+    <a href="https://github.com/AdguardTeam/AdguardVPNCLI/releases/">
         <img src="https://img.shields.io/github/tag/AdguardTeam/AdGuardVPNCLI.svg?label=release" alt="Latest release" />
     </a>
-    <a href="https://github.com/AdguardTeam/AdguardVPNForWindows/releases/">
+    <a href="https://github.com/AdguardTeam/AdguardVPNCLI/releases/">
     <img src="https://img.shields.io/github/tag-pre/AdguardTeam/AdGuardVPNCLI.svg?label=beta" alt="Beta version>" />
     </a>
 
