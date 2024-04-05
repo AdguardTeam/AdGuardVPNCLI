@@ -1,6 +1,6 @@
 # AdGuard VPN CLI
 
-<h3 align="center">Fast, flexible and reliable VPN solution for a command line interface</h3>
+<h3 align="center">Fast, flexible and reliable VPN solution for command-line enthusiasts</h3>
 
 <p align="center">
   Your online safety and anonymity guaranteed by a trusted developer.
