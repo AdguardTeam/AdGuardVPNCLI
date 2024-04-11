@@ -502,7 +502,7 @@ handle_existing() {
 
   log "Package ${exe_name} is already present in '${output_dir}'"
   # Check if vpn is running
-  if pgrep -x "${exe_name}" > /dev/null
+  if pgrep -x "${exe_name}" | grep -v $PPID > /dev/null
   then
     error_exit "AdGuard VPN is running. Please, stop it before installing"
   fi
