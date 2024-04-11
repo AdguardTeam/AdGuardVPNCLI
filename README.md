@@ -45,13 +45,13 @@ To install the latest version of AdGuard VPN CLI, run the following command:
 Just replace <update_channel> with one of the following values: release, beta, nightly
 
 ```shell
-curl -SsfL https://raw.githubusercontent.com/AdguardTeam/AdGuardVPNCLI/master/scripts/<update_channel>/install.sh | sh -s -- -v
+curl -fsSL https://raw.githubusercontent.com/AdguardTeam/AdGuardVPNCLI/master/scripts/<update_channel>/install.sh | sh -s -- -v
 ```
 
 To install a specific version of AdGuard VPN CLI, run the following command:
 
 ```shell
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/AdguardTeam/AdGuardVPNCLI/master/scripts/<update_channel>/install-<version_number>.sh)" install-<version_number>.sh -v
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/AdguardTeam/AdGuardVPNCLI/master/scripts/<update_channel>/install.sh)" install.sh -v -V <version_number>
 ```
 
 ## Verify Releases
