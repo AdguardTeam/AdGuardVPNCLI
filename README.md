@@ -17,12 +17,8 @@
     <a href="https://twitter.com/AdGuard">Twitter</a> |
     <a href="https://t.me/adguard_en">Telegram</a>
     <br /><br />
-    <a href="https://github.com/AdguardTeam/AdguardVPNCLI/releases/">
-        <img src="https://img.shields.io/github/tag/AdguardTeam/AdGuardVPNCLI.svg?label=release&filter=*release" alt="Latest release" />
-    </a>
-    <a href="https://github.com/AdguardTeam/AdguardVPNCLI/releases/">
-    <img src="https://img.shields.io/github/tag-pre/AdguardTeam/AdGuardVPNCLI.svg?label=beta&filter=*beta" alt="Beta version" />
-    </a>
+    <a href="https://github.com/AdguardTeam/AdguardVPNCLI/releases/"><img src="https://img.shields.io/github/tag/AdguardTeam/AdGuardVPNCLI.svg?label=release&filter=*release" alt="Latest release" /></a>
+    <a href="https://github.com/AdguardTeam/AdguardVPNCLI/releases/"><img src="https://img.shields.io/github/tag-pre/AdguardTeam/AdGuardVPNCLI.svg?label=beta&filter=*beta" alt="Beta version" /></a>
 
 <p align="center">
 <img src="https://cdn.adtidy.org/content/release_notes/vpn/cli/v1.0/adguardvpn-cli_connect.gif" width = "600"px>
