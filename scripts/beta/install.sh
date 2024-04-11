@@ -291,7 +291,7 @@ unpack() {
     fi
 		;;
 	('tar.gz')
-		if ! tar -C "$output_dir" -f "$pkg_name" -x -z
+		if ! tar -C "$output_dir" -f "$pkg_name" -x -z -U
 		then
 		  $remove_command "$pkg_name"
       error_exit "Cannot unpack '$pkg_name'"
@@ -306,7 +306,8 @@ unpack() {
 	log "Package has been unpacked successfully"
 
   # Check for existing symlink or .nosymlink file
-  if [ -L "/usr/local/bin/${exe_name}" ]; then
+  if [ -L "/usr/local/bin/${exe_name}" ] && \
+      [ "$(readlink -f "/usr/local/bin/${exe_name}")" = "$(readlink -f "${output_dir}/${exe_name}")" ]; then
     symlink_exists='1'
   fi
 
@@ -322,7 +323,7 @@ unpack() {
     [yY]|[yY][eE][sS])
       # Create a symlink with an absolute path
       absolute_path=$(readlink -f "${output_dir}/${exe_name}")
-      if ln -s "${absolute_path}" /usr/local/bin 2> /dev/null || sudo ln -s "${absolute_path}" /usr/local/bin; then
+      if ln -sf "${absolute_path}" /usr/local/bin 2> /dev/null || sudo ln -sf "${absolute_path}" /usr/local/bin; then
         symlink_exists='1'
         log "Binary has been linked to '/usr/local/bin'"
       else
@@ -550,7 +551,7 @@ channel='beta'
 verbose='0'
 cpu=''
 os=''
-version='0.99.14'
+version='0.99.20'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
