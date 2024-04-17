@@ -1,7 +1,7 @@
 name: Update install.sh
 on:
   release:
-    types: [published]
+    types: [published, unpublished, deleted]
 jobs:
   Update:
     runs-on: ubuntu-latest
