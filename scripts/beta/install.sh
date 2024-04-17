@@ -501,16 +501,8 @@ handle_existing() {
   fi
 
   log "Package ${exe_name} is already present in '${output_dir}'"
-  PIDFILE=
   # Check if vpn is running
-  if [ $os = 'linux' ]
-  then
-    PIDFILE="${XDG_DATA_HOME:-$HOME/.local/share}/${exe_name}/vpn.pid"
-  elif [ $os = 'macos' ]
-  then
-    PIDFILE="$HOME/Library/Application Support/${exe_name}/vpn.pid"
-  fi
-  if [ -f "$PIDFILE" ] && pgrep -F "$PIDFILE" > /dev/null
+  if pgrep -x "${exe_name}" > /dev/null
   then
     error_exit "AdGuard VPN is running. Please, stop it before installing"
   fi
