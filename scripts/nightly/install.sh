@@ -344,6 +344,31 @@ unpack() {
   verify_hint
 }
 
+# Function unpack unpacks the passed archive depending on it's extension.
+check_package() {
+  log "Checking downloaded package '$pkg_name'"
+  case "$pkg_ext"
+  in
+  ('zip')
+    if ! unzip "$pkg_name" -t -q
+    then
+      $remove_command "$pkg_name"
+      error_exit "Error checking $pkg_name"
+    fi
+    ;;
+  ('tar.gz')
+    if ! tar -f "$pkg_name" -z -t > /dev/null
+    then
+      $remove_command "$pkg_name"
+      error_exit "Error checking '$pkg_name'"
+    fi
+    ;;
+  (*)
+    error_exit "Unexpected package extension: '$pkg_ext'"
+    ;;
+  esac
+}
+
 # Function parse_version parses the version from the passed script and it's arguments.
 parse_version() {
   if [ -n "$version" ]; then
@@ -559,7 +584,7 @@ channel='nightly'
 verbose='0'
 cpu=''
 os=''
-version='0.99.33'
+version='0.99.36'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
@@ -567,9 +592,12 @@ symlink_exists='0'
 parse_opts "$@"
 
 configure
-handle_existing
 
 download
+check_package
+
+handle_existing
+
 unpack
 
 echo
@@ -577,7 +605,7 @@ echo "AdGuard VPN has been installed successfully!"
 echo "You can use it by running command:"
 if [ "$symlink_exists" -eq '1' ]
 then
-  echo "    ${exe_name}"
+  echo "    ${exe_name} --help"
 else
-  echo "    ${output_dir}/${exe_name}"
+  echo "    ${output_dir}/${exe_name} --help"
 fi
