@@ -23,5 +23,7 @@ jobs:
               git add "scripts/${channel}/install.sh"
             fi
           done
-          git commit -m "Update install.sh" || true
-          git push origin HEAD
+          if ! git diff-index --cached --quiet HEAD; then
+            git commit -m "Update install.sh"
+            git push origin HEAD
+          fi
