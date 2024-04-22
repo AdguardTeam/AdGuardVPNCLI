@@ -1,0 +1,28 @@
+name: Update install.sh
+on:
+  release:
+    types: [published, unpublished, deleted]
+jobs:
+  Update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Run script
+        run: |
+          set -e -x
+          git fetch origin master --tags
+          git checkout -B master origin/master
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com>"
+          git config user.name "github-actions[bot]"
+          for channel in release nightly beta; do
+            TAG_NAME=$(git tag -l --sort -creatordate | grep -F "${channel}" | head -n1 || true)
+            if [ -n "${TAG_NAME}" ]; then
+              curl -fsSL "https://github.com/AdguardTeam/AdGuardVPNCLI/releases/download/${TAG_NAME}/install.sh" -o "scripts/${channel}/install.sh"
+              git add "scripts/${channel}/install.sh"
+            fi
+          done
+          if ! git diff-index --cached --quiet HEAD; then
+            git commit -m "Update install.sh"
+            git push origin HEAD
+          fi
