@@ -29,6 +29,7 @@ body:
       description: |
         Examples:
           - **OS**: Ubuntu v22.04
+          - **Architecture**: x86-64
       value: |
           - OS:
     validations:
