@@ -146,7 +146,7 @@ Display the current status of the VPN service.
 
 Configure the VPN service with the following subcommands:
 
-- `set-mode`: Set the tool to operate in VPN mode (default SOCKS address: 127.0.0.1:1234)
+- `set-mode`: Set the tool to operate in VPN mode (default SOCKS address: 127.0.0.1:1080)
 - `set-dns`: Set the DNS upstream server
 - `set-socks-port`: Set the SOCKS port
 - `set-system-dns`: Set the system DNS servers by CLI VPN App. Available values: `on`, `off`
