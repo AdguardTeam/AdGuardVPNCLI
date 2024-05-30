@@ -275,35 +275,28 @@ verify_hint() {
 
 # Function unpack unpacks the passed archive depending on it's extension.
 unpack() {
-	log "Unpacking package from '$pkg_name' into '$output_dir'"
-  if ! mkdir -p "$output_dir"
+  log "Unpacking package from '$pkg_name' into '$output_dir'"
+  if ! mkdir -p "$output_dir/.temp"
   then
     error_exit "Cannot create directory '$output_dir'"
   fi
 
-	case "$pkg_ext"
-	in
-	('zip')
-		if ! unzip "$pkg_name" -d "$output_dir"
-		then
-      $remove_command "$pkg_name"
-      error_exit "Cannot unpack $pkg_name"
-    fi
-		;;
-	('tar.gz')
-		if ! tar -C "$output_dir" -f "$pkg_name" -x -z -U
-		then
-		  $remove_command "$pkg_name"
-      error_exit "Cannot unpack '$pkg_name'"
-    fi
-		;;
-	(*)
-		error_exit "Unexpected package extension: '$pkg_ext'"
-		;;
-	esac
+  if ! tar -C "$output_dir/.temp" -f "$pkg_name" -x -z
+  then
+    rm -rf "$output_dir/.temp"
+    $remove_command "$pkg_name"
+    error_exit "Cannot unpack '$pkg_name'"
+  fi
 
-	$remove_command "$pkg_name"
-	log "Package has been unpacked successfully"
+  if ! install -m 0755 "$output_dir/.temp/adguardvpn-cli" "$output_dir/" \
+     || ! install -m 0644 "$output_dir/.temp/adguardvpn-cli.sig" "$output_dir/"; then
+    rm -rf "$output_dir/.temp"
+    $remove_command "$pkg_name"
+    error_exit "Cannot install unpacked '$pkg_name'"
+  fi
+  rm -rf "$output_dir/.temp"
+  $remove_command "$pkg_name"
+  log "Package has been unpacked successfully"
 
   # Check for existing symlink or .nosymlink file
   if [ -L "/usr/local/bin/${exe_name}" ] && \
@@ -581,10 +574,10 @@ download() {
 exe_name='adguardvpn-cli'
 output_dir=''
 channel='beta'
-verbose='0'
+verbose='1'
 cpu=''
 os=''
-version='0.99.64'
+version='0.99.76'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
