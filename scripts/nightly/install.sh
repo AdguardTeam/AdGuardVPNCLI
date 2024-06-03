@@ -276,25 +276,17 @@ verify_hint() {
 # Function unpack unpacks the passed archive depending on it's extension.
 unpack() {
   log "Unpacking package from '$pkg_name' into '$output_dir'"
-  if ! mkdir -p "$output_dir/.temp"
+  if ! mkdir -p "$output_dir"
   then
     error_exit "Cannot create directory '$output_dir'"
   fi
 
-  if ! tar -C "$output_dir/.temp" -f "$pkg_name" -x -z
+  if ! tar -C "$output_dir" -f "$pkg_name" -x -z
   then
-    rm -rf "$output_dir/.temp"
     $remove_command "$pkg_name"
     error_exit "Cannot unpack '$pkg_name'"
   fi
 
-  if ! install -m 0755 "$output_dir/.temp/adguardvpn-cli" "$output_dir/" \
-     || ! install -m 0644 "$output_dir/.temp/adguardvpn-cli.sig" "$output_dir/"; then
-    rm -rf "$output_dir/.temp"
-    $remove_command "$pkg_name"
-    error_exit "Cannot install unpacked '$pkg_name'"
-  fi
-  rm -rf "$output_dir/.temp"
   $remove_command "$pkg_name"
   log "Package has been unpacked successfully"
 
@@ -577,7 +569,7 @@ channel='nightly'
 verbose='1'
 cpu=''
 os=''
-version='0.99.77'
+version='1.0.1'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
