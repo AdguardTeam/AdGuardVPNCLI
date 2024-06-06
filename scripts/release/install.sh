@@ -7,18 +7,18 @@ set -e -f -u
 # Function log is an echo wrapper that writes to stderr if the caller
 # requested verbosity level greater than 0.  Otherwise, it does nothing.
 log() {
-	if [ "$verbose" -gt '0' ]
-	then
-		echo "$1" 1>&2
-	fi
+  if [ "$verbose" -gt '0' ]
+  then
+    echo "$1" 1>&2
+  fi
 }
 
 # Function error_exit is an echo wrapper that writes to stderr and stops the
 # script execution with code 1.
 error_exit() {
-	echo "$1" 1>&2
+  echo "$1" 1>&2
 
-	exit 1
+  exit 1
 }
 
 # Function usage prints the note about how to use the script.
@@ -59,107 +59,110 @@ parse_opts() {
 #
 # See https://serverfault.com/a/163493/267530.
 is_little_endian() {
-	# The ASCII character "I" has the octal code of 111.  In the two-byte octal
-	# display mode (-o), hexdump will print it either as "000111" on a little
-	# endian system or as a "111000" on a big endian one.  Return the sixth
-	# character to compare it against the number '1'.
-	#
-	# Do not use echo -n, because its behavior in the presence of the -n flag is
-	# explicitly implementation-defined in POSIX.  Use hexdump instead of od,
-	# because OpenWrt and its derivatives have the former but not the latter.
-	is_little_endian_result="$(
-		printf 'I'\
-			| hexdump -o\
-			| awk '{ print substr($2, 6, 1); exit; }'
-	)"
-	readonly is_little_endian_result
+  # The ASCII character "I" has the octal code of 111.  In the two-byte octal
+  # display mode (-o), hexdump will print it either as "000111" on a little
+  # endian system or as a "111000" on a big endian one.  Return the sixth
+  # character to compare it against the number '1'.
+  #
+  # Do not use echo -n, because its behavior in the presence of the -n flag is
+  # explicitly implementation-defined in POSIX.  Use hexdump instead of od,
+  # because OpenWrt and its derivatives have the former but not the latter.
+  is_little_endian_result="$(
+    printf 'I'\
+      | hexdump -o\
+      | awk '{ print substr($2, 6, 1); exit; }'
+  )"
+  readonly is_little_endian_result
 
-	[ "$is_little_endian_result" -eq '1' ]
+  [ "$is_little_endian_result" -eq '1' ]
 }
 
 # Function set_os sets the os if needed and validates the value.
 set_os() {
-	# Set if needed.
-	if [ "$os" = '' ]
-	then
-		os="$( uname -s )"
-		case "$os"
-		in
-		('Darwin')
-			os='macos'
-			;;
-		('Linux')
-			os='linux'
-			;;
-		(*)
-			error_exit "Unsupported operating system: '$os'"
-			;;
-		esac
-	fi
+  # Set if needed.
+  if [ "$os" = '' ]
+  then
+    os="$( uname -s )"
+    case "$os"
+    in
+    ('Darwin')
+      os='macos'
+      ;;
+    ('Linux')
+      os='linux'
+      ;;
+    (*)
+      error_exit "Unsupported operating system: '$os'"
+      ;;
+    esac
+  fi
 
-	# Validate.
-	case "$os"
-	in
-	('macos'|'linux')
-		# All right, go on.
-		;;
-	(*)
-		error_exit "Unsupported operating system: '$os'"
-		;;
-	esac
+  # Validate.
+  case "$os"
+  in
+  ('macos'|'linux')
+    # All right, go on.
+    ;;
+  (*)
+    error_exit "Unsupported operating system: '$os'"
+    ;;
+  esac
 
-	# Log.
-	log "Operating system: $os"
+  # Log.
+  log "Operating system: $os"
 }
 
 # Function set_cpu sets the cpu if needed and validates the value.
 set_cpu() {
   # For macOS there is universal binary, so we don't need to set cpu
-	if [ "$os" = 'macos' ]
+  if [ "$os" = 'macos' ]
   then
     return 0
   fi
 
-	# Set if needed.
-	if [ "$cpu" = '' ]
-	then
-		cpu="$( uname -m )"
-		case "$cpu"
-		in
-		('x86_64'|'x86-64'|'x64'|'amd64')
-			cpu='x86_64'
-			;;
-		('aarch64'|'arm64')
-			cpu='aarch64'
-			;;
-		('mips')
-			if is_little_endian
-			then
-				cpu="mipsel"
-			fi
-			;;
-		(*)
-			error_exit "unsupported cpu type: $cpu"
-			;;
-		esac
-	fi
+  # Set if needed.
+  if [ "$cpu" = '' ]
+  then
+    cpu="$( uname -m )"
+    case "$cpu"
+    in
+    ('x86_64'|'x86-64'|'x64'|'amd64')
+      cpu='x86_64'
+      ;;
+    ('armv7l' | 'armv8l')
+      cpu='armv7'
+      ;;
+    ('aarch64'|'arm64')
+      cpu='aarch64'
+      ;;
+    ('mips')
+      if is_little_endian
+      then
+        cpu="mipsel"
+      fi
+      ;;
+    (*)
+      error_exit "unsupported cpu type: $cpu"
+      ;;
+    esac
+  fi
 
-	# Validate.
-	case "$cpu"
-	in
-	('x86_64'|'armv7'|'aarch64')
-		# All right, go on.
-		;;
-	('mips'|'mipsel')
-		# That's right too.
-		;;
-	(*)
-		error_exit "Unsupported cpu type: $cpu"
-		;;
-	esac
+  # Validate.
+  case "$cpu"
+  in
+  ('x86_64'|'armv7'|'aarch64')
+    # All right, go on.
+    ;;
+  ('mips'|'mipsel')
+    # That's right too.
+    ;;
+  (*)
+    error_exit "Unsupported cpu type: $cpu"
+    ;;
+  esac
 
-	# Log.
-	log "CPU type: $cpu"
+  # Log.
+  log "CPU type: $cpu"
 }
 
 # Function is_dir_owned_by_current_user checks if the output directory is owned by the current user
@@ -228,13 +231,13 @@ check_owner() {
 
 # Function check_out_dir requires the output directory to be set and exist.
 check_out_dir() {
-	if [ "$output_dir" = '' ]
-	then
-	  # If output_dir is not set, we will install to /opt
-	  output_dir='/opt'
-	fi
+  if [ "$output_dir" = '' ]
+  then
+    # If output_dir is not set, we will install to /opt
+    output_dir='/opt'
+  fi
 
-	# If output_dir is '.'or '/opt', create inside it `adguardvpn_cli` directory
+  # If output_dir is '.'or '/opt', create inside it `adguardvpn_cli` directory
   if [ "$output_dir" = '.' ] || [ "$output_dir" = '/opt' ]
   then
     output_dir="${output_dir}/adguardvpn_cli"
