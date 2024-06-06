@@ -15,7 +15,7 @@ jobs:
           git checkout -B master origin/master
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com>"
           git config user.name "github-actions[bot]"
-          for channel in release nightly beta; do
+          for channel in nightly; do
             TAG_NAME=$(git tag -l --sort -creatordate | grep -F "${channel}" | head -n1 || true)
             if [ -n "${TAG_NAME}" ]; then
               curl -fsSL "https://github.com/AdguardTeam/AdGuardVPNCLI/releases/download/${TAG_NAME}/install.sh" -o "scripts/${channel}/install.sh"
