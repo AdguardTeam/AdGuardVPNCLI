@@ -146,14 +146,14 @@ Display the current status of the VPN service.
 
 Configure the VPN service with the following subcommands:
 
-- `set-mode`: Set the tool to operate in VPN mode (default SOCKS address: 127.0.0.1:1080)
+- `set-mode`: Set the tool to operate in VPN mode (default SOCKS address: `127.0.0.1:1080`)
 - `set-dns`: Set the DNS upstream server
 - `set-socks-port`: Set the SOCKS port
 - `set-system-dns`: Set the system DNS servers by CLI VPN App. Available values: `on`, `off`
 - `set-no-routes`: Set the no routes flag. Available values: `on`, `off`. If enabled, the VPN service will not add any
   routes to the system routing table.
 - `send-reports`: Send crash reports to developers. Available values: `on`, `off`
-- `set-updates-channel`: Set the updates channel. Available channels: stable, beta, nightly
+- `set-update-channel`: Set the updates channel. Available channels: `release`, `beta`, `nightly`
 - `show`: Show the current configuration
 
 #### check-update
