@@ -295,7 +295,7 @@ unpack() {
   log "Package has been unpacked successfully"
 
   dir_name=$(echo "${pkg_name}" | sed -E -e 's/(.*)(\.tar\.gz|\.zip)/\1/')
-  mv -f "${output_dir}/${dir_name}/*" "${output_dir}"
+  mv -f "${output_dir}/${dir_name}/"* "${output_dir}"
   rmdir "${output_dir}/${dir_name}"
 
   # Check for existing symlink or .nosymlink file
