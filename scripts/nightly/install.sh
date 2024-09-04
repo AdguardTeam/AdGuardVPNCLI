@@ -2,7 +2,7 @@
 
 # AdGuard VPN Installation Script
 
-set -e -f -u
+set -e -u
 
 # Function log is an echo wrapper that writes to stderr if the caller
 # requested verbosity level greater than 0.  Otherwise, it does nothing.
@@ -37,6 +37,7 @@ parse_opts() {
       ;;
     'h')
       usage
+      exit 0
       ;;
     'o')
       output_dir="$OPTARG"
@@ -292,6 +293,10 @@ unpack() {
 
   $remove_command "$pkg_name"
   log "Package has been unpacked successfully"
+
+  dir_name=$(echo "${pkg_name}" | sed -E -e 's/(.*)(\.tar\.gz|\.zip)/\1/')
+  mv -f "${output_dir}/${dir_name}/*" "${output_dir}"
+  rmdir "${output_dir}/${dir_name}"
 
   # Check for existing symlink or .nosymlink file
   if [ -L "/usr/local/bin/${exe_name}" ] && \
@@ -572,7 +577,7 @@ channel='nightly'
 verbose='1'
 cpu=''
 os=''
-version='1.0.3'
+version='1.1.75'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
