@@ -501,7 +501,10 @@ remove_existing() {
   # Remove .sig file
   rm -f "${output_dir}/${exe_name}.sig"
   log "'${exe_name}.sig' has been removed from '${output_dir}'"
-  # Remove .sig file
+  # Remove bash-completion.sh
+  rm -f "${output_dir}/bash-completion.sh"
+  log "'bash-completion.sh' has been removed from '${output_dir}'"
+  # Remove .nosymlink file
   rm -f "${output_dir}/.nosymlink"
 }
 
@@ -577,7 +580,7 @@ channel='nightly'
 verbose='1'
 cpu=''
 os=''
-version='1.1.75'
+version='1.1.92'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
@@ -595,10 +598,14 @@ unpack
 
 echo
 echo "AdGuard VPN has been installed successfully!"
+echo
 echo "You can use it by running command:"
 if [ "$symlink_exists" -eq '1' ]
 then
   echo "    ${exe_name} --help"
+  echo
+  echo "To enable bash-completion, please add the following line to your shell profile"
+  echo "    [ -s \"${output_dir}/bash-completion.sh\" ] && \. \"${output_dir}/bash-completion.sh\""
 else
   echo "    ${output_dir}/${exe_name} --help"
 fi
