@@ -167,10 +167,10 @@ set_cpu() {
 }
 
 set_is_root() {
-  if [ $USER == "root" ]; then
+  if [ $USER = "root" ]; then
     is_root='1'
   fi
-  if [ "$(id -u)" == "0" ]; then
+  if [ "$(id -u)" = "0" ]; then
     is_root='1'
   fi
 }
