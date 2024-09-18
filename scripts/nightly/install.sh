@@ -166,16 +166,31 @@ set_cpu() {
   log "CPU type: $cpu"
 }
 
+set_is_root() {
+  if [ $USER == "root" ]; then
+    is_root='1'
+  fi
+  if [ "$(id -u)" == "0" ]; then
+    is_root='1'
+  fi
+}
+
 # Function is_dir_owned_by_current_user checks if the output directory is owned by the current user
 is_dir_owned_by_current_user() {
   dir="$1"
 
   if [ "$os" = "macos" ]; then
       # macOS
-      owner_name=$(stat -f '%Su' "$dir")
+      if ! owner_name=$(stat -f '%Su' "$dir"); then
+          echo "Cannot stat '$dir'"
+          return 0
+      fi
   elif [ "$os" = "linux" ]; then
       # Linux
-      owner_name=$(stat -c '%U' "$dir")
+      if ! owner_name=$(stat -c '%U' "$dir"); then
+          echo "Cannot stat '$dir'"
+          return 0
+      fi
   else
       echo "Unsupported OS: $os"
       return 1
@@ -193,12 +208,16 @@ create_dir() {
   mkdir -p "$output_dir" 2>/dev/null
   if [ $? -eq 1 ];
   then
-    echo "Starting sudo to create directory '$output_dir'"
-    if sudo mkdir -p "$output_dir"; then
+    if [ "$is_root" -eq 0 ]; then
+      echo "Starting sudo to create directory '$output_dir'"
+      if sudo mkdir -p "$output_dir"; then
         sudo chown -R "${SUDO_USER:-$USER}" "$output_dir"
         log "'$output_dir' has been created and ownership has been set to '${SUDO_USER:-$USER}'"
-    else
+      else
         error_exit "Failed to create '$output_dir' with sudo"
+      fi
+    else
+      error_exit "Failed to create '$output_dir'"
     fi
   else
     log "'$output_dir' has been created"
@@ -207,6 +226,9 @@ create_dir() {
 
 # Check if the directory is owned by the current user and change the ownership if needed
 check_owner() {
+  if [ "${is_root}" -eq 1 ]; then
+    return 0
+  fi
   if is_dir_owned_by_current_user "$output_dir";
   then
     log "'$output_dir' exists and is owned by '$USER'"
@@ -316,7 +338,7 @@ unpack() {
     [yY]|[yY][eE][sS])
       # Create a symlink with an absolute path
       absolute_path=$(readlink -f "${output_dir}/${exe_name}")
-      if ln -sf "${absolute_path}" /usr/local/bin 2> /dev/null || sudo ln -sf "${absolute_path}" /usr/local/bin; then
+      if ln -sf "${absolute_path}" /usr/local/bin 2> /dev/null || [ "$is_root" -eq 0 ] && sudo ln -sf "${absolute_path}" /usr/local/bin; then
         symlink_exists='1'
         log "Binary has been linked to '/usr/local/bin'"
       else
@@ -397,6 +419,7 @@ configure() {
     log "Update channel: $channel"
   fi
 
+  set_is_root
   set_cpu
   set_os
   parse_version
@@ -446,11 +469,15 @@ handle_uninstall() {
     rmdir "${output_dir}" 2>/dev/null
     if [ $? -eq 1 ];
     then
-      echo "Starting sudo to remove '${output_dir}'"
-      if sudo rmdir "${output_dir}"; then
-        log "Empty directory '${output_dir}' has been removed"
+      if [ "$is_root" -eq 0 ]; then
+        echo "Starting sudo to remove '${output_dir}'"
+        if sudo rmdir "${output_dir}"; then
+          log "Empty directory '${output_dir}' has been removed"
+        else
+          error_exit "Failed to remove empty directory '${output_dir}' with sudo"
+        fi
       else
-        error_exit "Failed to remove empty directory '${output_dir}' with sudo"
+        error_exit "Failed to remove empty directory '${output_dir}'"
       fi
     else
       log "Empty directory '${output_dir}' has been removed"
@@ -467,11 +494,15 @@ handle_uninstall() {
     # Check success
     if [ $? -eq 1 ];
     then
-      echo "Starting sudo to remove '/usr/local/bin/${exe_name}'"
-      if sudo rm -f "/usr/local/bin/${exe_name}"; then
-        log "Symlink has been removed from '/usr/local/bin'"
+      if [ "$is_root" -eq 0 ]; then
+        echo "Starting sudo to remove '/usr/local/bin/${exe_name}'"
+        if sudo rm -f "/usr/local/bin/${exe_name}"; then
+          log "Symlink has been removed from '/usr/local/bin'"
+        else
+          log "Failed to remove symlink from '/usr/local/bin' with sudo"
+        fi
       else
-        log "Failed to remove symlink from '/usr/local/bin' with sudo"
+        log "Failed to remove symlink from '/usr/local/bin'"
       fi
     else
       log "Symlink has been removed from '/usr/local/bin'"
@@ -548,19 +579,24 @@ download() {
 
   # Check if we can write to the current directory by creating a temporary file
   if ! touch "$tmp_file" > /dev/null 2>&1; then
-    printf "Cannot create file in the current directory. Try downloading as root? [y/N] "
-    read -r response < /dev/tty
-    case "$response" in
-    [yY]|[yY][eE][sS])
-      remove_command="sudo rm -f"
-      if ! sudo curl -fsSL "$url" -o "$pkg_name"; then
-        error_exit "Failed to download $pkg_name: $?"
-      fi
-      ;;
-    *)
+    if [ "$is_root" -eq 0 ]; then
+      printf "Cannot create file in the current directory. Try downloading as root? [y/N] "
+      read -r response < /dev/tty
+      case "$response" in
+      [yY]|[yY][eE][sS])
+        remove_command="sudo rm -f"
+        if ! sudo curl -fsSL "$url" -o "$pkg_name"; then
+          error_exit "Failed to download $pkg_name: $?"
+        fi
+        ;;
+      *)
+        error_exit "Cannot proceed without file creation rights."
+        ;;
+      esac
+    else
+      log "Cannot create file in the current directory."
       error_exit "Cannot proceed without file creation rights."
-      ;;
-    esac
+    fi
   else
     # Cleanup the temporary file
     rm "$tmp_file"
@@ -580,10 +616,11 @@ channel='nightly'
 verbose='1'
 cpu=''
 os=''
-version='1.1.92'
+version='1.1.99'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
+is_root='0'
 
 parse_opts "$@"
 
