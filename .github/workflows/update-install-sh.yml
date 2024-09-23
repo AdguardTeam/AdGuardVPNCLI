@@ -2,6 +2,7 @@ name: Update install.sh
 on:
   release:
     types: [published, unpublished, deleted]
+  workflow_dispatch:
 jobs:
   Update:
     runs-on: ubuntu-latest
