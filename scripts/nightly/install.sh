@@ -616,7 +616,7 @@ channel='nightly'
 verbose='1'
 cpu=''
 os=''
-version='1.1.108'
+version='1.1.112'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
@@ -641,8 +641,16 @@ if [ "$symlink_exists" -eq '1' ]
 then
   echo "    ${exe_name} --help"
   echo
-  echo "To enable bash-completion, please add the following line to your shell profile"
-  echo "    [ -s \"${output_dir}/bash-completion.sh\" ] && \. \"${output_dir}/bash-completion.sh\""
+  case ${SHELL:-sh} in
+  *zsh)
+    echo "To enable bash-completion, please add the following line to your shell configuration (~/.zshrc):"
+    echo "    [ -s \"${output_dir}/bash-completion.sh\" ] && \. \"${output_dir}/bash-completion.sh\""
+    ;;
+  *bash*)
+    echo "To enable bash-completion, please add the following line to your shell configuration (~/.bashrc):"
+    echo "    [ -s \"${output_dir}/bash-completion.sh\" ] && \. \"${output_dir}/bash-completion.sh\""
+    ;;
+  esac
 else
   echo "    ${output_dir}/${exe_name} --help"
 fi
