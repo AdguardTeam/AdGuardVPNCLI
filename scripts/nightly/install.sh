@@ -299,27 +299,14 @@ verify_hint() {
   fi
 }
 
-# Function unpack unpacks the passed archive depending on it's extension.
-unpack() {
-  log "Unpacking package from '$pkg_name' into '$output_dir'"
-  if ! mkdir -p "$output_dir"
-  then
-    error_exit "Cannot create directory '$output_dir'"
-  fi
-
-  if ! tar -C "$output_dir" -f "$pkg_name" -x -z
-  then
-    $remove_command "$pkg_name"
-    error_exit "Cannot unpack '$pkg_name'"
-  fi
-
-  $remove_command "$pkg_name"
-  log "Package has been unpacked successfully"
-
-  dir_name=$(echo "${pkg_name}" | sed -E -e 's/(.*)(\.tar\.gz|\.zip)/\1/')
-  mv -f "${output_dir}/${dir_name}/"* "${output_dir}"
-  rmdir "${output_dir}/${dir_name}"
-
+create_symlink() {
+  case "$PATH" in
+  */usr/local/bin*)
+    ;;
+  *)
+    return 0
+    ;;
+  esac
   # Check for existing symlink or .nosymlink file
   if [ -L "/usr/local/bin/${exe_name}" ] && \
       [ "$(readlink -f "/usr/local/bin/${exe_name}")" = "$(readlink -f "${output_dir}/${exe_name}")" ]; then
@@ -355,8 +342,45 @@ unpack() {
       ;;
     esac
   fi
+}
 
-  verify_hint
+# Function unpack unpacks the passed archive depending on it's extension.
+unpack() {
+  log "Unpacking package from '$pkg_name' into '$output_dir'"
+  if ! mkdir -p "$output_dir"
+  then
+    error_exit "Cannot create directory '$output_dir'"
+  fi
+
+  if ! tar -C "$output_dir" -f "$pkg_name" -x -z
+  then
+    $remove_command "$pkg_name"
+    error_exit "Cannot unpack '$pkg_name'"
+  fi
+
+  $remove_command "$pkg_name"
+  log "Package has been unpacked successfully"
+
+  dir_name=$(echo "${pkg_name}" | sed -E -e 's/(.*)(\.tar\.gz|\.zip)/\1/')
+  if [ -z "${dir_name}" ]; then
+    error_exit "Can not determine directory name inside archive"
+  fi
+  if type mv > /dev/null 2>&1; then
+    mv -f "${output_dir}/${dir_name}/"* "${output_dir}"
+  elif type ln > /dev/null 2>&1; then
+    ln -f "${output_dir}/${dir_name}/"* "${output_dir}"
+    rm -f "${output_dir}/${dir_name}/"*
+  else
+    error_exit "You need mv or ln for this script to work. Make sure that \"coreutils-mv\" is installed."
+  fi
+  if type rmdir > /dev/null 2>&1; then
+    rmdir "${output_dir}/${dir_name}"
+  else
+    if [ "$(echo "${output_dir}/${dir_name}/"*)" != "${output_dir}/${dir_name}/*" ]; then
+      error_exit "Directory not empty"
+    fi
+    rm -rf "${output_dir:?}/${dir_name:?}"
+  fi
 }
 
 # Function unpack unpacks the passed archive depending on it's extension.
@@ -608,6 +632,31 @@ download() {
   log "AdGuard VPN package has been downloaded successfully"
 }
 
+report_success() {
+  echo
+  echo "AdGuard VPN has been installed successfully!"
+  echo
+  echo "You can use it by running command:"
+  if [ "$symlink_exists" -eq '1' ]
+  then
+    echo "    ${exe_name} --help"
+  else
+    echo "    ${output_dir}/${exe_name} --help"
+  fi
+
+  echo
+  case ${SHELL:-sh} in
+  *zsh)
+    echo "To enable bash-completion, please add the following line to your shell configuration (~/.zshrc):"
+    echo "    [ -s \"${output_dir}/bash-completion.sh\" ] && \. \"${output_dir}/bash-completion.sh\""
+    ;;
+  *bash*)
+    echo "To enable bash-completion, please add the following line to your shell configuration (~/.bashrc):"
+    echo "    [ -s \"${output_dir}/bash-completion.sh\" ] && \. \"${output_dir}/bash-completion.sh\""
+    ;;
+  esac
+}
+
 # Entrypoint
 
 exe_name='adguardvpn-cli'
@@ -616,7 +665,7 @@ channel='nightly'
 verbose='1'
 cpu=''
 os=''
-version='1.1.112'
+version='1.1.125'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
@@ -632,25 +681,7 @@ check_package
 handle_existing
 
 unpack
+create_symlink
+verify_hint
 
-echo
-echo "AdGuard VPN has been installed successfully!"
-echo
-echo "You can use it by running command:"
-if [ "$symlink_exists" -eq '1' ]
-then
-  echo "    ${exe_name} --help"
-  echo
-  case ${SHELL:-sh} in
-  *zsh)
-    echo "To enable bash-completion, please add the following line to your shell configuration (~/.zshrc):"
-    echo "    [ -s \"${output_dir}/bash-completion.sh\" ] && \. \"${output_dir}/bash-completion.sh\""
-    ;;
-  *bash*)
-    echo "To enable bash-completion, please add the following line to your shell configuration (~/.bashrc):"
-    echo "    [ -s \"${output_dir}/bash-completion.sh\" ] && \. \"${output_dir}/bash-completion.sh\""
-    ;;
-  esac
-else
-  echo "    ${output_dir}/${exe_name} --help"
-fi
+report_success
