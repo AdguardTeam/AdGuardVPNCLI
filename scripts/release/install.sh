@@ -2,7 +2,7 @@
 
 # AdGuard VPN Installation Script
 
-set -e -f -u
+set -e -u
 
 # Function log is an echo wrapper that writes to stderr if the caller
 # requested verbosity level greater than 0.  Otherwise, it does nothing.
@@ -37,6 +37,7 @@ parse_opts() {
       ;;
     'h')
       usage
+      exit 0
       ;;
     'o')
       output_dir="$OPTARG"
@@ -165,16 +166,31 @@ set_cpu() {
   log "CPU type: $cpu"
 }
 
+set_is_root() {
+  if [ $USER = "root" ]; then
+    is_root='1'
+  fi
+  if [ "$(id -u)" = "0" ]; then
+    is_root='1'
+  fi
+}
+
 # Function is_dir_owned_by_current_user checks if the output directory is owned by the current user
 is_dir_owned_by_current_user() {
   dir="$1"
 
   if [ "$os" = "macos" ]; then
       # macOS
-      owner_name=$(stat -f '%Su' "$dir")
+      if ! owner_name=$(stat -f '%Su' "$dir"); then
+          echo "Cannot stat '$dir'"
+          return 0
+      fi
   elif [ "$os" = "linux" ]; then
       # Linux
-      owner_name=$(stat -c '%U' "$dir")
+      if ! owner_name=$(stat -c '%U' "$dir"); then
+          echo "Cannot stat '$dir'"
+          return 0
+      fi
   else
       echo "Unsupported OS: $os"
       return 1
@@ -192,12 +208,16 @@ create_dir() {
   mkdir -p "$output_dir" 2>/dev/null
   if [ $? -eq 1 ];
   then
-    echo "Starting sudo to create directory '$output_dir'"
-    if sudo mkdir -p "$output_dir"; then
+    if [ "$is_root" -eq 0 ]; then
+      echo "Starting sudo to create directory '$output_dir'"
+      if sudo mkdir -p "$output_dir"; then
         sudo chown -R "${SUDO_USER:-$USER}" "$output_dir"
         log "'$output_dir' has been created and ownership has been set to '${SUDO_USER:-$USER}'"
-    else
+      else
         error_exit "Failed to create '$output_dir' with sudo"
+      fi
+    else
+      error_exit "Failed to create '$output_dir'"
     fi
   else
     log "'$output_dir' has been created"
@@ -206,6 +226,9 @@ create_dir() {
 
 # Check if the directory is owned by the current user and change the ownership if needed
 check_owner() {
+  if [ "${is_root}" -eq 1 ]; then
+    return 0
+  fi
   if is_dir_owned_by_current_user "$output_dir";
   then
     log "'$output_dir' exists and is owned by '$USER'"
@@ -276,23 +299,14 @@ verify_hint() {
   fi
 }
 
-# Function unpack unpacks the passed archive depending on it's extension.
-unpack() {
-  log "Unpacking package from '$pkg_name' into '$output_dir'"
-  if ! mkdir -p "$output_dir"
-  then
-    error_exit "Cannot create directory '$output_dir'"
-  fi
-
-  if ! tar -C "$output_dir" -f "$pkg_name" -x -z
-  then
-    $remove_command "$pkg_name"
-    error_exit "Cannot unpack '$pkg_name'"
-  fi
-
-  $remove_command "$pkg_name"
-  log "Package has been unpacked successfully"
-
+create_symlink() {
+  case "$PATH" in
+  */usr/local/bin*)
+    ;;
+  *)
+    return 0
+    ;;
+  esac
   # Check for existing symlink or .nosymlink file
   if [ -L "/usr/local/bin/${exe_name}" ] && \
       [ "$(readlink -f "/usr/local/bin/${exe_name}")" = "$(readlink -f "${output_dir}/${exe_name}")" ]; then
@@ -311,7 +325,7 @@ unpack() {
     [yY]|[yY][eE][sS])
       # Create a symlink with an absolute path
       absolute_path=$(readlink -f "${output_dir}/${exe_name}")
-      if ln -sf "${absolute_path}" /usr/local/bin 2> /dev/null || sudo ln -sf "${absolute_path}" /usr/local/bin; then
+      if ln -sf "${absolute_path}" /usr/local/bin 2> /dev/null || [ "$is_root" -eq 0 ] && sudo ln -sf "${absolute_path}" /usr/local/bin; then
         symlink_exists='1'
         log "Binary has been linked to '/usr/local/bin'"
       else
@@ -328,8 +342,45 @@ unpack() {
       ;;
     esac
   fi
+}
 
-  verify_hint
+# Function unpack unpacks the passed archive depending on it's extension.
+unpack() {
+  log "Unpacking package from '$pkg_name' into '$output_dir'"
+  if ! mkdir -p "$output_dir"
+  then
+    error_exit "Cannot create directory '$output_dir'"
+  fi
+
+  if ! tar -C "$output_dir" -f "$pkg_name" -x -z
+  then
+    $remove_command "$pkg_name"
+    error_exit "Cannot unpack '$pkg_name'"
+  fi
+
+  $remove_command "$pkg_name"
+  log "Package has been unpacked successfully"
+
+  dir_name=$(echo "${pkg_name}" | sed -E -e 's/(.*)(\.tar\.gz|\.zip)/\1/')
+  if [ -z "${dir_name}" ]; then
+    error_exit "Can not determine directory name inside archive"
+  fi
+  if type mv > /dev/null 2>&1; then
+    mv -f "${output_dir}/${dir_name}/"* "${output_dir}"
+  elif type ln > /dev/null 2>&1; then
+    ln -f "${output_dir}/${dir_name}/"* "${output_dir}"
+    rm -f "${output_dir}/${dir_name}/"*
+  else
+    error_exit "You need mv or ln for this script to work. Make sure that \"coreutils-mv\" is installed."
+  fi
+  if type rmdir > /dev/null 2>&1; then
+    rmdir "${output_dir}/${dir_name}"
+  else
+    if [ "$(echo "${output_dir}/${dir_name}/"*)" != "${output_dir}/${dir_name}/*" ]; then
+      error_exit "Directory not empty"
+    fi
+    rm -rf "${output_dir:?}/${dir_name:?}"
+  fi
 }
 
 # Function unpack unpacks the passed archive depending on it's extension.
@@ -392,6 +443,7 @@ configure() {
     log "Update channel: $channel"
   fi
 
+  set_is_root
   set_cpu
   set_os
   parse_version
@@ -441,11 +493,15 @@ handle_uninstall() {
     rmdir "${output_dir}" 2>/dev/null
     if [ $? -eq 1 ];
     then
-      echo "Starting sudo to remove '${output_dir}'"
-      if sudo rmdir "${output_dir}"; then
-        log "Empty directory '${output_dir}' has been removed"
+      if [ "$is_root" -eq 0 ]; then
+        echo "Starting sudo to remove '${output_dir}'"
+        if sudo rmdir "${output_dir}"; then
+          log "Empty directory '${output_dir}' has been removed"
+        else
+          error_exit "Failed to remove empty directory '${output_dir}' with sudo"
+        fi
       else
-        error_exit "Failed to remove empty directory '${output_dir}' with sudo"
+        error_exit "Failed to remove empty directory '${output_dir}'"
       fi
     else
       log "Empty directory '${output_dir}' has been removed"
@@ -462,11 +518,15 @@ handle_uninstall() {
     # Check success
     if [ $? -eq 1 ];
     then
-      echo "Starting sudo to remove '/usr/local/bin/${exe_name}'"
-      if sudo rm -f "/usr/local/bin/${exe_name}"; then
-        log "Symlink has been removed from '/usr/local/bin'"
+      if [ "$is_root" -eq 0 ]; then
+        echo "Starting sudo to remove '/usr/local/bin/${exe_name}'"
+        if sudo rm -f "/usr/local/bin/${exe_name}"; then
+          log "Symlink has been removed from '/usr/local/bin'"
+        else
+          log "Failed to remove symlink from '/usr/local/bin' with sudo"
+        fi
       else
-        log "Failed to remove symlink from '/usr/local/bin' with sudo"
+        log "Failed to remove symlink from '/usr/local/bin'"
       fi
     else
       log "Symlink has been removed from '/usr/local/bin'"
@@ -496,7 +556,10 @@ remove_existing() {
   # Remove .sig file
   rm -f "${output_dir}/${exe_name}.sig"
   log "'${exe_name}.sig' has been removed from '${output_dir}'"
-  # Remove .sig file
+  # Remove bash-completion.sh
+  rm -f "${output_dir}/bash-completion.sh"
+  log "'bash-completion.sh' has been removed from '${output_dir}'"
+  # Remove .nosymlink file
   rm -f "${output_dir}/.nosymlink"
 }
 
@@ -540,19 +603,24 @@ download() {
 
   # Check if we can write to the current directory by creating a temporary file
   if ! touch "$tmp_file" > /dev/null 2>&1; then
-    printf "Cannot create file in the current directory. Try downloading as root? [y/N] "
-    read -r response < /dev/tty
-    case "$response" in
-    [yY]|[yY][eE][sS])
-      remove_command="sudo rm -f"
-      if ! sudo curl -fsSL "$url" -o "$pkg_name"; then
-        error_exit "Failed to download $pkg_name: $?"
-      fi
-      ;;
-    *)
+    if [ "$is_root" -eq 0 ]; then
+      printf "Cannot create file in the current directory. Try downloading as root? [y/N] "
+      read -r response < /dev/tty
+      case "$response" in
+      [yY]|[yY][eE][sS])
+        remove_command="sudo rm -f"
+        if ! sudo curl -fsSL "$url" -o "$pkg_name"; then
+          error_exit "Failed to download $pkg_name: $?"
+        fi
+        ;;
+      *)
+        error_exit "Cannot proceed without file creation rights."
+        ;;
+      esac
+    else
+      log "Cannot create file in the current directory."
       error_exit "Cannot proceed without file creation rights."
-      ;;
-    esac
+    fi
   else
     # Cleanup the temporary file
     rm "$tmp_file"
@@ -564,6 +632,31 @@ download() {
   log "AdGuard VPN package has been downloaded successfully"
 }
 
+report_success() {
+  echo
+  echo "AdGuard VPN has been installed successfully!"
+  echo
+  echo "You can use it by running command:"
+  if [ "$symlink_exists" -eq '1' ]
+  then
+    echo "    ${exe_name} --help"
+  else
+    echo "    ${output_dir}/${exe_name} --help"
+  fi
+
+  echo
+  case ${SHELL:-sh} in
+  *zsh)
+    echo "To enable bash-completion, please add the following line to your shell configuration (~/.zshrc):"
+    echo "    [ -s \"${output_dir}/bash-completion.sh\" ] && \. \"${output_dir}/bash-completion.sh\""
+    ;;
+  *bash*)
+    echo "To enable bash-completion, please add the following line to your shell configuration (~/.bashrc):"
+    echo "    [ -s \"${output_dir}/bash-completion.sh\" ] && \. \"${output_dir}/bash-completion.sh\""
+    ;;
+  esac
+}
+
 # Entrypoint
 
 exe_name='adguardvpn-cli'
@@ -572,10 +665,11 @@ channel='release'
 verbose='1'
 cpu=''
 os=''
-version='1.0.0'
+version='1.1.126'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
+is_root='0'
 
 parse_opts "$@"
 
@@ -587,13 +681,7 @@ check_package
 handle_existing
 
 unpack
+create_symlink
+verify_hint
 
-echo
-echo "AdGuard VPN has been installed successfully!"
-echo "You can use it by running command:"
-if [ "$symlink_exists" -eq '1' ]
-then
-  echo "    ${exe_name} --help"
-else
-  echo "    ${output_dir}/${exe_name} --help"
-fi
+report_success
