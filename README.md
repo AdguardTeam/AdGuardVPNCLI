@@ -135,8 +135,6 @@ Connect to the VPN service.
 - `-f, --fastest`: Connect to the fastest available location.
 - `-v, --verbose`: Show log from the VPN service.
 - `--no-fork`: Do not fork the VPN service to the background.
-- `--ppid-file TEXT`: File for writing parent process ID.
-- `--pid-file TEXT`: File for writing process ID.
 - `-y, --yes`: Automatically answer 'yes' to all questions.
 - `-4, --ipv4only`: Force the application to connect only to IPv4 servers.
 - `-6, --ipv6only`: Force the application to connect only to IPv6 servers.
