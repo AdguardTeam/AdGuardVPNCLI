@@ -125,15 +125,21 @@ Log out from the VPN service.
 List all available VPN locations.
 
 - `count INT`: Number of locations to display, sorted by ping.
+- `--bash-completion TEXT`: List suggestions for bash-completion.
 
 #### connect
 
 Connect to the VPN service.
 
-- `-l, --location TEXT`: Specify the location to connect to. Defaults to the last used location.
+- `-l, --location TEXT`: Specify the location to connect to (city name, country name, or ISO code). Defaults to the last used location.
 - `-f, --fastest`: Connect to the fastest available location.
 - `-v, --verbose`: Show log from the VPN service.
 - `--no-fork`: Do not fork the VPN service to the background.
+- `--ppid-file TEXT`: File for writing parent process ID.
+- `--pid-file TEXT`: File for writing process ID.
+- `-y, --yes`: Automatically answer 'yes' to all questions.
+- `-4, --ipv4only`: Force the application to connect only to IPv4 servers.
+- `-6, --ipv6only`: Force the application to connect only to IPv6 servers.
 
 #### disconnect
 
@@ -143,24 +149,56 @@ Stop the VPN service.
 
 Display the current status of the VPN service.
 
+#### license
+
+Get license information.
+
 #### config
 
 Configure the VPN service with the following subcommands:
 
-- `set-mode`: Set the tool to operate in VPN mode (default SOCKS address: `127.0.0.1:1080`)
-- `set-dns`: Set the DNS upstream server
-- `set-socks-port`: Set the SOCKS port
-- `set-system-dns`: Set the system DNS servers by CLI VPN App. Available values: `on`, `off`
-- `set-no-routes`: Set the no routes flag. Available values: `on`, `off`. If enabled, the VPN service will not add any
-  routes to the system routing table.
-- `send-reports`: Send crash reports to developers. Available values: `on`, `off`
-- `set-update-channel`: Set the updates channel. Available channels: `release`, `beta`, `nightly`
-- `show`: Show the current configuration
+- `set-mode`: Set VPN operating mode (TUN/SOCKS). SOCKS default address is `127.0.0.1:1080`. You can adjust the port number.
+- `set-dns`: Set the DNS upstream server.
+- `set-socks-port`: Set the SOCKS port.
+- `set-socks-host`: Set the SOCKS listen host. For non-localhost addresses, you need to protect the proxy with a username and password.
+- `set-socks-username`: Set the SOCKS username.
+- `set-socks-password`: Set the SOCKS password.
+- `clear-socks-auth`: Clear the SOCKS username and password.
+- `set-system-dns`: Set the system DNS servers.
+- `set-tun-routing-mode`: Set VPN tunnel routing mode (AUTO/SCRIPT/NONE).
+- `create-route-script`: Create a route script with proper permissions.
+- `send-reports`: Send crash reports to developers.
+- `set-update-channel`: Set the update channel (release, beta, nightly).
+- `set-use-quic`: Set whether to use QUIC protocol.
+- `set-show-hints`: Show hints after command execution.
+- `set-debug-logging`: Enable or disable debug logging.
+- `set-show-notifications`: Show notifications about the VPN connection status.
+- `show`: Show the current configuration.
 
 #### check-update
 
 Check for updates to the VPN service.
 
+#### export-logs
+
+Export logs to a zip file.
+
+- `-o, --output TEXT`: Path to the output artifact. Can be a directory.
+- `-f, --force`: Overwrite the output artifact without asking.
+
 #### update
 
-Update VPN CLI to the latest version from the specified channel.
+Install the latest version if available.
+
+- `-v, --verbose`: Show update script output.
+- `-y, --yes`: Automatically answer 'yes' to all questions.
+
+#### site-exclusions
+
+Control site exclusions with the following subcommands:
+
+- `add`: Add specified exclusions.
+- `remove`: Remove specified exclusions.
+- `show`: Show all exclusions.
+- `clear`: Clear all exclusions.
+- `mode`: Set VPN exclusion mode (general/selective) or show the current mode if no options are passed.
