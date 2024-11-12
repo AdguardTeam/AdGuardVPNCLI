@@ -23,12 +23,12 @@ error_exit() {
 
 # Function usage prints the note about how to use the script.
 usage() {
-  echo 'Usage: install.sh [-o output_dir] [-v] [-h] [-u]' 1>&2
+  echo 'Usage: install.sh [-o output_dir] [-v] [-h] [-u] [-p archive_path] [-a y|n]' 1>&2
 }
 
 # Function parse_opts parses the options list and validates it's combinations.
 parse_opts() {
-  while getopts 'vho:uV:' opt "$@"
+  while getopts 'vho:uV:p:a:' opt "$@"
   do
     case "$opt"
     in
@@ -47,6 +47,23 @@ parse_opts() {
       ;;
     'V')
       version="$OPTARG"
+      ;;
+    'p')
+      archive_path="$OPTARG"
+      ;;
+    'a')
+      case "$OPTARG" in
+      [yY]|[yY][eE][sS])
+        auto_answer="y"
+        ;;
+      [nN]|[nN][oO])
+        auto_answer="n"
+        ;;
+      *)
+        echo "Invalid value for -a. Use 'y' or 'n' (or 'yes'/'no')." 1>&2
+        exit 1
+        ;;
+      esac
       ;;
     *)
       log "bad option $OPTARG"
@@ -166,6 +183,18 @@ set_cpu() {
   log "CPU type: $cpu"
 }
 
+# Function for queries with support for auto-answer
+ask_user() {
+  local prompt="$1"
+  printf "%s" "$prompt"
+  if [ -n "$auto_answer" ]; then
+    response="$auto_answer"
+    echo "$response"
+  else
+    read -r response < /dev/tty
+  fi
+}
+
 set_is_root() {
   if [ $USER = "root" ]; then
     is_root='1'
@@ -234,8 +263,7 @@ check_owner() {
     log "'$output_dir' exists and is owned by '$USER'"
   else
     log "'$output_dir' exists but is not owned by '$USER'"
-    printf "Would you like to change the ownership of %s to %s? [y/N] " "$output_dir" "$USER"
-    read -r response < /dev/tty
+    ask_user "Would you like to change the ownership of $output_dir to $USER? [y/N] "
     case "$response" in
     [yY]|[yY][eE][sS])
       target_user="${SUDO_USER:-$USER}"
@@ -319,8 +347,7 @@ create_symlink() {
     log "'.nosymlink' file exists in the installation directory. No further action taken."
   else
     # Ask user about linking the binary to /usr/local/bin
-    printf "Would you like to link the binary to /usr/local/bin? [y/N] "
-    read -r response < /dev/tty
+    ask_user "Would you like to link the binary to /usr/local/bin? [y/N] "
     case "$response" in
     [yY]|[yY][eE][sS])
       # Create a symlink with an absolute path
@@ -344,6 +371,13 @@ create_symlink() {
   fi
 }
 
+# Function remove_downloaded_package deletes the archive only if it was downloaded and not transferred.
+remove_downloaded_package() {
+  if [ -z "$archive_path" ]; then
+    $remove_command "$pkg_name"
+  fi
+}
+
 # Function unpack unpacks the passed archive depending on it's extension.
 unpack() {
   log "Unpacking package from '$pkg_name' into '$output_dir'"
@@ -354,14 +388,16 @@ unpack() {
 
   if ! tar -C "$output_dir" -f "$pkg_name" -x -z
   then
-    $remove_command "$pkg_name"
+    remove_downloaded_package
     error_exit "Cannot unpack '$pkg_name'"
   fi
 
-  $remove_command "$pkg_name"
+  remove_downloaded_package
   log "Package has been unpacked successfully"
 
-  dir_name=$(echo "${pkg_name}" | sed -E -e 's/(.*)(\.tar\.gz|\.zip)/\1/')
+  base_name=$(basename "$pkg_name")
+  dir_name=$(echo "${base_name}" | sed -E -e 's/(.*)(\.tar\.gz|\.zip)/\1/')
+#  dir_name=$(echo "${pkg_name}" | sed -E -e 's/(.*)(\.tar\.gz|\.zip)/\1/')
   if [ -z "${dir_name}" ]; then
     error_exit "Can not determine directory name inside archive"
   fi
@@ -391,14 +427,14 @@ check_package() {
   ('zip')
     if ! unzip "$pkg_name" -t -q
     then
-      $remove_command "$pkg_name"
+      remove_downloaded_package
       error_exit "Error checking $pkg_name"
     fi
     ;;
   ('tar.gz')
     if ! tar -f "$pkg_name" -z -t > /dev/null
     then
-      $remove_command "$pkg_name"
+      remove_downloaded_package
       error_exit "Error checking '$pkg_name'"
     fi
     ;;
@@ -443,13 +479,20 @@ configure() {
     log "Update channel: $channel"
   fi
 
+  pkg_ext='tar.gz'
+  if [ -n "$archive_path" ]; then
+    pkg_name="$archive_path"
+    need_download='0'
+    log "Use users archive: $archive_path"
+    return
+  fi
+
   set_is_root
   set_cpu
   set_os
   parse_version
   check_out_dir
 
-  pkg_ext='tar.gz'
   if [ "$os" = 'macos' ]
   then
     pkg_name="${exe_name}-macos.${pkg_ext}"
@@ -596,6 +639,10 @@ handle_existing() {
 
 # Function download downloads the package from the url.
 download() {
+  if [ "$need_download" -eq '0' ]; then
+    return
+  fi
+
   log "Downloading AdGuard VPN package: $url"
 
   # Temporary file name for testing file creation
@@ -604,8 +651,7 @@ download() {
   # Check if we can write to the current directory by creating a temporary file
   if ! touch "$tmp_file" > /dev/null 2>&1; then
     if [ "$is_root" -eq 0 ]; then
-      printf "Cannot create file in the current directory. Try downloading as root? [y/N] "
-      read -r response < /dev/tty
+      ask_user "Cannot create file in the current directory. Try downloading as root? [y/N] "
       case "$response" in
       [yY]|[yY][eE][sS])
         remove_command="sudo rm -f"
@@ -665,17 +711,20 @@ channel='nightly'
 verbose='1'
 cpu=''
 os=''
-version='1.1.128'
+version='1.2.6'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
 is_root='0'
+archive_path=''
+auto_answer=''
+need_download='1'
 
 parse_opts "$@"
 
 configure
-
 download
+
 check_package
 
 handle_existing
