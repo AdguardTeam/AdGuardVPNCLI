@@ -347,7 +347,7 @@ create_symlink() {
     log "'.nosymlink' file exists in the installation directory. No further action taken."
   else
     # Ask user about linking the binary to /usr/local/bin
-    ask_user "Would you like to link the binary to /usr/local/bin? [y/N] "
+    ask_user "Would you like to create a link in /usr/local/bin to the executable? [y/N] "
     case "$response" in
     [yY]|[yY][eE][sS])
       # Create a symlink with an absolute path
@@ -711,7 +711,7 @@ channel='nightly'
 verbose='1'
 cpu=''
 os=''
-version='1.2.6'
+version='1.2.10'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
