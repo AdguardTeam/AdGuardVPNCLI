@@ -479,6 +479,10 @@ configure() {
     log "Update channel: $channel"
   fi
 
+  set_is_root
+  set_cpu
+  set_os
+
   pkg_ext='tar.gz'
   if [ -n "$archive_path" ]; then
     pkg_name="$archive_path"
@@ -487,9 +491,6 @@ configure() {
     return
   fi
 
-  set_is_root
-  set_cpu
-  set_os
   parse_version
   check_out_dir
 
@@ -711,7 +712,7 @@ channel='nightly'
 verbose='1'
 cpu=''
 os=''
-version='1.2.25'
+version='1.2.27'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
