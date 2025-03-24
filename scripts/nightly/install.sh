@@ -421,6 +421,10 @@ unpack() {
 
 # Function unpack unpacks the passed archive depending on it's extension.
 check_package() {
+  if [ "$uninstall" -eq '1' ]; then
+    return 0
+  fi
+
   log "Checking downloaded package '$pkg_name'"
   case "$pkg_ext"
   in
@@ -446,6 +450,10 @@ check_package() {
 
 # Function parse_version parses the version from the passed script and it's arguments.
 parse_version() {
+  if [ "$uninstall" -eq '1' ]; then
+    return 0
+  fi
+  
   if [ -n "$version" ]; then
     return 0
   fi
@@ -593,7 +601,7 @@ handle_uninstall() {
 
 # Function remove_existing removes the existing package from the output directory before installing a new one.
 remove_existing() {
-  log 'Remove existing package...'
+  log 'Removing existing package...'
   # Remove executable file
   rm -f "${output_dir}/${exe_name}"
   log "'${exe_name}' has been removed from '${output_dir}'"
@@ -640,6 +648,10 @@ handle_existing() {
 
 # Function download downloads the package from the url.
 download() {
+  if [ "$uninstall" -eq '1' ]; then
+    return 0
+  fi
+
   if [ "$need_download" -eq '0' ]; then
     return
   fi
@@ -712,7 +724,7 @@ channel='nightly'
 verbose='1'
 cpu=''
 os=''
-version='1.2.27'
+version='1.2.39'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
