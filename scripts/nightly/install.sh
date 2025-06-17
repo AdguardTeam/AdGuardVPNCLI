@@ -359,7 +359,7 @@ create_symlink() {
         log "Failed to link the binary to '/usr/local/bin'"
       fi
       ;;
-    [Nn][Oo]|[Nn])
+    ""|[Nn][Oo]|[Nn])
       # Create a .nosymlink file in the installation directory
       touch "${output_dir}/.nosymlink"
       log "'.nosymlink' file has been created in the installation directory"
@@ -724,7 +724,7 @@ channel='nightly'
 verbose='1'
 cpu=''
 os=''
-version='1.3.9'
+version='1.3.17'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
