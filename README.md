@@ -37,16 +37,22 @@ AdGuard VPN CLI provides a command-line interface for managing VPN connection.
 
 To install the latest version of AdGuard VPN CLI, run the following command:
 
-Just replace <update_channel> with one of the following values: stable, beta, nightly
+Release channel:
 
 ```shell
-curl -S -s -f -L https://static.adtidy.net/cli/<update_channel>/install.sh | sh -s -- -v
+curl -fsSL https://raw.githubusercontent.com/AdguardTeam/AdGuardVPNCLI/HEAD/scripts/release/install.sh | sh -s -- -v
 ```
 
-To install a specific version of AdGuard VPN CLI, run the following command:
+Beta channel:
 
 ```shell
-curl -S -s -f -L https://static.adtidy.net/cli/<update_channel>/install-<specific-version-num>.sh | sh -s -- -v
+curl -fsSL https://raw.githubusercontent.com/AdguardTeam/AdGuardVPNCLI/HEAD/scripts/beta/install.sh | sh -s -- -v
+```
+
+Nightly channel:
+
+```shell
+curl -fsSL https://raw.githubusercontent.com/AdguardTeam/AdGuardVPNCLI/HEAD/scripts/nightly/install.sh | sh -s -- -v
 ```
 
 ## Verify Releases
@@ -125,23 +131,19 @@ Log out from the VPN service.
 List all available VPN locations.
 
 - `count INT`: Number of locations to display, sorted by ping.
+- `--bash-completion TEXT`: List suggestions for bash-completion.
 
 #### connect
 
 Connect to the VPN service.
 
-- `-l, --location TEXT`: Specify the location to connect to. Defaults to the last used location.
+- `-l, --location TEXT`: Specify the location to connect to (city name, country name, or ISO code). Defaults to the last used location.
 - `-f, --fastest`: Connect to the fastest available location.
 - `-v, --verbose`: Show log from the VPN service.
 - `--no-fork`: Do not fork the VPN service to the background.
-- `--ppid-file TEXT`: File for writing parent process ID.
-- `--pid-file TEXT`: File for writing process ID.
-- `-y, --yes`: Automatic answering 'yes' to all questions.
+- `-y, --yes`: Automatically answer 'yes' to all questions.
 - `-4, --ipv4only`: Force the application to connect only to IPv4 servers.
 - `-6, --ipv6only`: Force the application to connect only to IPv6 servers.
-- `--log-to-file`: Redirect process output to file when `--no-fork` flag is used.
-- `--no-progress`: Do not show styled log progress when `--no-fork` flag is not used.
-- `--boot`: Automatically and indefinitely retries connection.
 
 #### disconnect
 
@@ -159,23 +161,23 @@ Get license information.
 
 Configure the VPN service with the following subcommands:
 
-- `set-mode`: Set the tool to operate in VPN mode (default SOCKS address: 127.0.0.1:1080)
-- `set-dns`: Set the DNS upstream server
-- `set-socks-port`: Set the SOCKS port
-- `set-socks-host`: Set the SOCKS listen host. For non-localhost address, you need to protect proxy with username and password
-- `set-socks-username`: Set the SOCKS username
-- `set-socks-password`: Set the SOCKS password
-- `clear-socks-auth`: Clear the SOCKS username and password
-- `set-change-system-dns`: Set the system DNS servers by CLI VPN App. Available values: `on`, `off`
-- `set-tun-routing-mode`: Set the VPN tunnel routing mode. Available values: `auto`, `script`, `none`
-- `create-route-script`: Create route script with proper permissions
-- `set-crash-reporting`: Send crash reports to developers. Available values: `on`, `off`
-- `set-updates-channel`: Set the updates channel. Available channels: `release`, `beta`, `nightly`
+- `set-mode`: Set VPN operating mode (TUN/SOCKS). SOCKS default address is `127.0.0.1:1080`. You can adjust the port number.
+- `set-dns`: Set the DNS upstream server.
+- `set-socks-port`: Set the SOCKS port.
+- `set-socks-host`: Set the SOCKS listen host. For non-localhost addresses, you need to protect the proxy with a username and password.
+- `set-socks-username`: Set the SOCKS username.
+- `set-socks-password`: Set the SOCKS password.
+- `clear-socks-auth`: Clear the SOCKS username and password.
+- `set-system-dns`: Set the system DNS servers.
+- `set-tun-routing-mode`: Set VPN tunnel routing mode (AUTO/SCRIPT/NONE).
+- `create-route-script`: Create a route script with proper permissions.
+- `send-reports`: Send crash reports to developers.
+- `set-update-channel`: Set the update channel (release, beta, nightly).
 - `set-protocol`: Set the protocol used by AdGuard VPN. Available values: `auto`, `http2`, `quic`
-- `set-post-quantum`: Set the use of advanced cryptographic algorithms resistant to quantum computer attacks to protect your traffic from potential future threats. Available values: `on`, `off`
-- `set-show-notifications`: Show notifications for VPN connection status. Available values: `on`, `off`
-- `set-bound-if-override`: Override network interface to use for outbound VPN traffic (pass "" to disable)
-- `show`: Show the current configuration
+- `set-show-hints`: Show hints after command execution.
+- `set-debug-logging`: Enable or disable debug logging.
+- `set-show-notifications`: Show notifications about the VPN connection status.
+- `show`: Show the current configuration.
 
 #### check-update
 
