@@ -151,6 +151,10 @@ Stop the VPN service.
 
 Display the current status of the VPN service.
 
+#### license
+
+Get license information.
+
 #### config
 
 Configure the VPN service with the following subcommands:
