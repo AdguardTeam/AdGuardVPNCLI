@@ -173,7 +173,7 @@ Configure the VPN service with the following subcommands:
 - `create-route-script`: Create a route script with proper permissions.
 - `send-reports`: Send crash reports to developers.
 - `set-update-channel`: Set the update channel (release, beta, nightly).
-- `set-use-quic`: Set whether to use QUIC protocol.
+- `set-protocol`: Set the protocol used by AdGuard VPN. Available values: `auto`, `http2`, `quic`
 - `set-show-hints`: Show hints after command execution.
 - `set-debug-logging`: Enable or disable debug logging.
 - `set-show-notifications`: Show notifications about the VPN connection status.
