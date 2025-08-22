@@ -115,16 +115,29 @@ Run `adguardvpn-cli [command]` to use the VPN service. Below are the available c
 
 Each subcommand has its own set of options. Run `adguardvpn-cli [command] --help` to see the list of available options.
 
-#### login
+## Log in and log out
 
-Log in to the VPN service.
+To log in or create an account, type:
 
-- `-u, --username TEXT`: Username for login.
-- `-p, --password TEXT`: Password for login.
+    adguardvpn-cli login
 
-#### logout
+When prompted with the menu:
 
-Log out from the VPN service.
+    b - Open link in browser
+    s - Speed up check
+    x - Cancel
+
+select `b` to open the authentication page in your default browser. Enter your email address. Once you are logged in, you will see the message *Successfully logged in* in the Terminal.
+
+You can set up your preferred login method (password or one-time code) and two-factor authentication in your [AdGuard account](https://adguardaccount.com/account/settings).
+
+:::note
+You can also create an AdGuard account on our [website](https://auth.adguardaccount.com/login.html) and then log in to AdGuard VPN for Linux using your credentials.
+:::
+
+To log out of AdGuard VPN, type:
+
+    adguardvpn-cli logout
 
 #### list-locations
 
