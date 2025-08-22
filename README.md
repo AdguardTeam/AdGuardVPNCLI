@@ -131,9 +131,9 @@ select `b` to open the authentication page in your default browser. Enter your e
 
 You can set up your preferred login method (password or one-time code) and two-factor authentication in your [AdGuard account](https://adguardaccount.com/account/settings).
 
-:::note
+>**Note:**
 You can also create an AdGuard account on our [website](https://auth.adguardaccount.com/login.html) and then log in to AdGuard VPN for Linux using your credentials.
-:::
+
 
 To log out of AdGuard VPN, type:
 
