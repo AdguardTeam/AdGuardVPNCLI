@@ -395,7 +395,7 @@ unpack() {
   remove_downloaded_package
   log "Package has been unpacked successfully"
 
-  base_name=$(basename "$pkg_name")
+  base_name=$(echo "$pkg_name" | sed -E 's!.*/!!')
   dir_name=$(echo "${base_name}" | sed -E -e 's/(.*)(\.tar\.gz|\.zip)/\1/')
 #  dir_name=$(echo "${pkg_name}" | sed -E -e 's/(.*)(\.tar\.gz|\.zip)/\1/')
   if [ -z "${dir_name}" ]; then
@@ -724,7 +724,7 @@ channel='nightly'
 verbose='1'
 cpu=''
 os=''
-version='1.5.8'
+version='1.5.13'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
