@@ -488,8 +488,9 @@ configure() {
   fi
 
   set_is_root
-  set_cpu
   set_os
+  set_cpu
+  check_out_dir
 
   pkg_ext='tar.gz'
   if [ -n "$archive_path" ]; then
@@ -500,7 +501,6 @@ configure() {
   fi
 
   parse_version
-  check_out_dir
 
   if [ "$os" = 'macos' ]
   then
@@ -764,7 +764,7 @@ channel='nightly'
 verbose='1'
 cpu=''
 os=''
-version='1.6.16'
+version='1.6.20'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
