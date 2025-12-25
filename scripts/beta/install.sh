@@ -488,8 +488,9 @@ configure() {
   fi
 
   set_is_root
-  set_cpu
   set_os
+  set_cpu
+  check_out_dir
 
   pkg_ext='tar.gz'
   if [ -n "$archive_path" ]; then
@@ -500,7 +501,6 @@ configure() {
   fi
 
   parse_version
-  check_out_dir
 
   if [ "$os" = 'macos' ]
   then
@@ -716,6 +716,46 @@ report_success() {
   esac
 }
 
+post_install() {
+  if [ -z "$version" ]; then
+    src=""
+    if [ -n "${pkg_name:-}" ]; then
+      src="$pkg_name"
+    elif [ -n "${archive_path:-}" ]; then
+      src="$archive_path"
+    fi
+    if [ -n "$src" ]; then
+      version=$(echo "$src" | sed -nE "s@.*${exe_name}-([0-9]+\.[0-9]+\.[0-9]+).*@\\1@p")
+    fi
+  fi
+  min_major=1
+  min_minor=6
+  min_patch=10
+
+  v_major=$(echo "$version" | sed -nE 's/^([0-9]+).*$/\1/p')
+  v_minor=$(echo "$version" | sed -nE 's/^[0-9]+\.([0-9]+).*$/\1/p')
+  v_patch=$(echo "$version" | sed -nE 's/^[0-9]+\.[0-9]+\.([0-9]+).*$/\1/p')
+  if [ -z "$v_major" ]; then
+    return 0
+  fi
+  [ -z "$v_minor" ] && v_minor=0
+  [ -z "$v_patch" ] && v_patch=0
+
+  if [ "$v_major" -lt "$min_major" ] || { [ "$v_major" -eq "$min_major" ] && [ "$v_minor" -lt "$min_minor" ]; } || { [ "$v_major" -eq "$min_major" ] && [ "$v_minor" -eq "$min_minor" ] && [ "$v_patch" -lt "$min_patch" ]; } ; then
+    return 0
+  fi
+
+  local args=""
+  case "$auto_answer" in
+  [Yy]) args="-y" ;;
+  [Nn]) args="-n" ;;
+  esac
+  if ! "${output_dir}/${exe_name}" post_install $args; then
+    echo "Post-installation step failed"
+    exit 1
+  fi
+}
+
 # Entrypoint
 
 exe_name='adguardvpn-cli'
@@ -724,7 +764,7 @@ channel='beta'
 verbose='1'
 cpu=''
 os=''
-version='1.5.12'
+version='1.6.26'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
@@ -744,6 +784,7 @@ handle_existing
 
 unpack
 create_symlink
+post_install
 verify_hint
 
 report_success
