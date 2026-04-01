@@ -181,15 +181,17 @@ Configure the VPN service with the following subcommands:
 - `set-socks-username`: Set the SOCKS username.
 - `set-socks-password`: Set the SOCKS password.
 - `clear-socks-auth`: Clear the SOCKS username and password.
-- `set-system-dns`: Set the system DNS servers.
+- `set-change-system-dns`: Set the system DNS servers.
 - `set-tun-routing-mode`: Set VPN tunnel routing mode (AUTO/SCRIPT/NONE).
 - `create-route-script`: Create a route script with proper permissions.
-- `send-reports`: Send crash reports to developers.
+- `set-crash-reporting`: Send crash reports to developers.
 - `set-update-channel`: Set the update channel (release, beta, nightly).
 - `set-protocol`: Set the protocol used by AdGuard VPN. Available values: `auto`, `http2`, `quic`
+- `set-post-quantum`: Set the use of advanced cryptographic algorithms resistant to quantum computer attacks to protect your traffic from potential future threats.
 - `set-show-hints`: Show hints after command execution.
 - `set-debug-logging`: Enable or disable debug logging.
 - `set-show-notifications`: Show notifications about the VPN connection status.
+- `set-bound-if-override`: Override network interface to use for outbound VPN traffic (pass "" to disable).
 - `show`: Show the current configuration.
 
 #### check-update
