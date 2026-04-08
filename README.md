@@ -56,7 +56,7 @@ curl -fsSL https://raw.githubusercontent.com/AdguardTeam/AdGuardVPNCLI/HEAD/scri
 ```
 
 > [!NOTE]
-> You can also install and run the AdGuard VPN for Linux Docker container on MikroTik routers with RouterOS. For more information and detailed instructions, refer to our [dedicated guide](https://adguard-vpn.com/kb/adguard-vpn-for-linux/setting-up-on-a-router/mikrotik/).
+> You can also install and run the AdGuard VPN CLI Docker container on MikroTik routers with RouterOS. For more information and detailed instructions, refer to our [dedicated guide](https://adguard-vpn.com/kb/adguard-vpn-for-linux/setting-up-on-a-router/mikrotik/).
 
 ## Verify Releases
 
