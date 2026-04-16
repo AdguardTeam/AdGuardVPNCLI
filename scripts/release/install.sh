@@ -417,6 +417,12 @@ unpack() {
     fi
     rm -rf "${output_dir:?}/${dir_name:?}"
   fi
+
+  # The completion script is sourced by interactive shells and must stay
+  # readable for non-owner users regardless of how it was packed in the archive.
+  if [ -f "${output_dir}/bash-completion.sh" ]; then
+    chmod 0644 "${output_dir}/bash-completion.sh"
+  fi
 }
 
 # Function unpack unpacks the passed archive depending on it's extension.
