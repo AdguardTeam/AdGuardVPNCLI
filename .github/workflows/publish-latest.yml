@@ -28,6 +28,7 @@ on:
 
 permissions:
   contents: write
+  workflows: write
 
 # Serialize mirror runs so concurrent releases can't race on the shared
 # per-channel tags and releases.
