@@ -13,8 +13,10 @@ name: Publish latest release
 #   v1.8.0-rc.1         -> Latest beta      v1.8.0-rc.1-beta
 #   v1.8.0              -> Latest release   v1.8.0-release
 #
-# The assets of the real release are copied into the "Latest <channel>"
-# release so consumers can always reference a stable per-channel pointer.
+# The "Latest <channel>" release is updated in place (its tag is repointed
+# and its assets are refreshed) rather than deleted and recreated, so it
+# keeps its identity — URL, comments, reactions and download counters — and
+# does not emit a fresh "new release" notification on every publish.
 on:
   release:
     types: [published]
@@ -26,6 +28,12 @@ on:
 
 permissions:
   contents: write
+
+# Serialize mirror runs so concurrent releases can't race on the shared
+# per-channel tags and releases.
+concurrency:
+  group: publish-latest
+  cancel-in-progress: false
 
 jobs:
   Mirror:
@@ -56,10 +64,10 @@ jobs:
           fi
 
           case "$TAG" in
-            *-nightly.*) channel=nightly; suffix=-nightly; prerelease=1 ;;
-            *-beta.*)    channel=beta;    suffix=-beta;    prerelease=1 ;;
-            *-rc.*)      channel=beta;    suffix=-beta;    prerelease=1 ;;
-            *)           channel=release; suffix=-release; prerelease=0 ;;
+            *-nightly.*) channel=nightly; suffix=-nightly; prerelease=true ;;
+            *-beta.*)    channel=beta;    suffix=-beta;    prerelease=true ;;
+            *-rc.*)      channel=beta;    suffix=-beta;    prerelease=true ;;
+            *)           channel=release; suffix=-release; prerelease=false ;;
           esac
           export TITLE="Latest ${channel}"
           LATEST_TAG="${TAG}${suffix}"
@@ -67,36 +75,57 @@ jobs:
           # The mirror tag must point at the same commit as the real release.
           TARGET="$(git rev-list -n 1 "$TAG")"
 
-          # Copy every asset from the real release.
-          rm -rf mirror-assets
-          mkdir -p mirror-assets
-          gh release download "$TAG" --dir mirror-assets || true
-
-          # Remove the previous "Latest <channel>" release (and its tag) so it
-          # can be recreated pointing at the new source release.
-          gh release list --limit 200 --json tagName,name \
-            --jq 'map(select((.name // "") == env.TITLE)) | .[].tagName' \
-            | while IFS= read -r old_tag; do
-                [ -n "$old_tag" ] || continue
-                gh release delete "$old_tag" --cleanup-tag --yes || true
-              done
-
           NOTES="Automatically maintained mirror of \`${TAG}\`.
 
           Source release: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
 
+          # Copy the assets of the real release.
+          rm -rf mirror-assets
+          mkdir -p mirror-assets
+          gh release download "$TAG" --dir mirror-assets || true
           ASSETS=()
           if compgen -G "mirror-assets/*" > /dev/null; then
             ASSETS=(mirror-assets/*)
           fi
 
-          FLAG=()
-          if [ "$prerelease" -eq 1 ]; then
-            FLAG=(--prerelease)
-          fi
+          # Current tag of the existing "Latest <channel>" release, if any.
+          OLD_TAG="$(gh release list --limit 200 --json tagName,name \
+            --jq 'map(select((.name // "") == env.TITLE)) | .[0].tagName // ""')"
 
-          gh release create "$LATEST_TAG" "${ASSETS[@]}" \
-            --target "$TARGET" \
-            --title "$TITLE" \
-            --notes "$NOTES" \
-            "${FLAG[@]}"
+          # (Re)point the per-channel "latest" tag at the new release's commit.
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git tag -f "$LATEST_TAG" "$TARGET"
+          git push -f origin "refs/tags/$LATEST_TAG"
+
+          if [ -z "$OLD_TAG" ]; then
+            # First run for this channel: create the rolling release once.
+            gh release create "$LATEST_TAG" "${ASSETS[@]}" \
+              --title "$TITLE" \
+              --notes "$NOTES" \
+              --prerelease="$prerelease"
+          else
+            # Update the existing release in place: repoint its tag and refresh
+            # its metadata. The release keeps its identity instead of being
+            # deleted and recreated.
+            gh release edit "$OLD_TAG" \
+              --tag "$LATEST_TAG" \
+              --title "$TITLE" \
+              --notes "$NOTES" \
+              --prerelease="$prerelease"
+
+            # Replace the assets: drop the previous ones, upload the new set.
+            gh release view "$LATEST_TAG" --json assets --jq '.assets[].name' \
+              | while IFS= read -r asset; do
+                  [ -n "$asset" ] || continue
+                  gh release delete-asset "$LATEST_TAG" "$asset" --yes || true
+                done
+            if [ ${#ASSETS[@]} -gt 0 ]; then
+              gh release upload "$LATEST_TAG" "${ASSETS[@]}" --clobber
+            fi
+
+            # Drop the now-orphaned previous "latest" tag.
+            if [ "$OLD_TAG" != "$LATEST_TAG" ]; then
+              git push origin ":refs/tags/$OLD_TAG" || true
+            fi
+          fi
