@@ -509,7 +509,7 @@ configure() {
     pkg_name="${exe_name}-${os}-${cpu}.${pkg_ext}"
   fi
   apply_version
-  url="https://github.com/AdguardTeam/AdGuardVPNCLI/releases/download/v${version}/${pkg_name}"
+  url="https://github.com/AdguardTeam/AdGuardVPNCLI/releases/download/v${version}-${channel}/${pkg_name}"
 
   readonly output_dir url pkg_name
 
@@ -764,7 +764,7 @@ channel='nightly'
 verbose='1'
 cpu=''
 os=''
-version='1.7.18'
+version='1.8.0-nightly.3'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
