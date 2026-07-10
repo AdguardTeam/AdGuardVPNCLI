@@ -1,0 +1,102 @@
+name: Publish latest release
+# Migration assistance for publishing.
+#
+# Developers publish real releases with semantic version tags:
+#   v1.8.0-nightly.1   v1.8.0-beta.1   v1.8.0-rc.1   v1.8.0
+#
+# For each of them this workflow maintains a rolling "Latest <channel>"
+# release whose tag is auto-created from the real tag:
+#
+#   real tag            -> latest release   latest tag
+#   v1.8.0-nightly.1    -> Latest nightly   v1.8.0-nightly.1-nightly
+#   v1.8.0-beta.1       -> Latest beta      v1.8.0-beta.1-beta
+#   v1.8.0-rc.1         -> Latest beta      v1.8.0-rc.1-beta
+#   v1.8.0              -> Latest release   v1.8.0-release
+#
+# The assets of the real release are copied into the "Latest <channel>"
+# release so consumers can always reference a stable per-channel pointer.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Real release tag to mirror (e.g. v1.8.0-nightly.1)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  Mirror:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Mirror the release into its "Latest <channel>" release
+        run: |
+          set -e -x
+
+          # On a release event only tag_name is set; on manual dispatch only
+          # inputs.tag is set. Concatenation yields whichever one is present.
+          TAG="${{ github.event.release.tag_name }}${{ github.event.inputs.tag }}"
+
+          # Only mirror real release tags. The auto-created "latest" mirror tags
+          # (…-nightly, …-beta, …-release) do not match this pattern, so they
+          # are ignored — which also stops this workflow from triggering itself
+          # in an endless loop when it publishes a mirror release.
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-(nightly|beta|rc)\.[0-9]+)?$'; then
+            echo "Tag '$TAG' is not a real release tag; nothing to mirror."
+            exit 0
+          fi
+
+          case "$TAG" in
+            *-nightly.*) channel=nightly; suffix=-nightly; prerelease=1 ;;
+            *-beta.*)    channel=beta;    suffix=-beta;    prerelease=1 ;;
+            *-rc.*)      channel=beta;    suffix=-beta;    prerelease=1 ;;
+            *)           channel=release; suffix=-release; prerelease=0 ;;
+          esac
+          export TITLE="Latest ${channel}"
+          LATEST_TAG="${TAG}${suffix}"
+
+          # The mirror tag must point at the same commit as the real release.
+          TARGET="$(git rev-list -n 1 "$TAG")"
+
+          # Copy every asset from the real release.
+          rm -rf mirror-assets
+          mkdir -p mirror-assets
+          gh release download "$TAG" --dir mirror-assets || true
+
+          # Remove the previous "Latest <channel>" release (and its tag) so it
+          # can be recreated pointing at the new source release.
+          gh release list --limit 200 --json tagName,name \
+            --jq 'map(select((.name // "") == env.TITLE)) | .[].tagName' \
+            | while IFS= read -r old_tag; do
+                [ -n "$old_tag" ] || continue
+                gh release delete "$old_tag" --cleanup-tag --yes || true
+              done
+
+          NOTES="Automatically maintained mirror of \`${TAG}\`.
+
+          Source release: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+
+          ASSETS=()
+          if compgen -G "mirror-assets/*" > /dev/null; then
+            ASSETS=(mirror-assets/*)
+          fi
+
+          FLAG=()
+          if [ "$prerelease" -eq 1 ]; then
+            FLAG=(--prerelease)
+          fi
+
+          gh release create "$LATEST_TAG" "${ASSETS[@]}" \
+            --target "$TARGET" \
+            --title "$TITLE" \
+            --notes "$NOTES" \
+            "${FLAG[@]}"
