@@ -44,8 +44,6 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - name: Mirror the release into its "Latest <channel>" release
         run: |
@@ -73,8 +71,9 @@ jobs:
           export TITLE="Latest ${channel}"
           LATEST_TAG="${TAG}${suffix}"
 
-          # The mirror tag must point at the same commit as the real release.
-          TARGET="$(git rev-list -n 1 "$TAG")"
+          # Resolve the exact commit the real release tag points to
+          # (dereferences annotated tags). The mirror tag is placed here.
+          TARGET="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${TAG}" --jq .sha)"
 
           NOTES="Automatically maintained mirror of \`${TAG}\`.
 
@@ -93,11 +92,17 @@ jobs:
           OLD_TAG="$(gh release list --limit 200 --json tagName,name \
             --jq 'map(select((.name // "") == env.TITLE)) | .[0].tagName // ""')"
 
-          # (Re)point the per-channel "latest" tag at the new release's commit.
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
-          git tag -f "$LATEST_TAG" "$TARGET"
-          git push -f origin "refs/tags/$LATEST_TAG"
+          # (Re)point the per-channel "latest" tag at the new release's commit
+          # through the API. A plain "git push" of the tag would be rejected:
+          # the release commit touches .github/workflows and the default
+          # GITHUB_TOKEN lacks the "workflows" permission required to push it.
+          if gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${LATEST_TAG}" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${LATEST_TAG}" \
+              -f sha="${TARGET}" -F force=true
+          else
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/${LATEST_TAG}" -f sha="${TARGET}"
+          fi
 
           if [ -z "$OLD_TAG" ]; then
             # First run for this channel: create the rolling release once.
@@ -125,8 +130,9 @@ jobs:
               gh release upload "$LATEST_TAG" "${ASSETS[@]}" --clobber
             fi
 
-            # Drop the now-orphaned previous "latest" tag.
+            # Drop the now-orphaned previous "latest" tag (via the API, for the
+            # same "workflows" permission reason as above).
             if [ "$OLD_TAG" != "$LATEST_TAG" ]; then
-              git push origin ":refs/tags/$OLD_TAG" || true
+              gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${OLD_TAG}" || true
             fi
           fi
