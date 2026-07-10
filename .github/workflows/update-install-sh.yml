@@ -3,9 +3,15 @@ on:
   release:
     types: [published, unpublished, deleted]
   workflow_dispatch:
+
+permissions:
+  contents: write
+
 jobs:
   Update:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Check out repository code
         uses: actions/checkout@v6
@@ -16,13 +22,42 @@ jobs:
           git checkout -B master origin/master
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com>"
           git config user.name "github-actions[bot]"
+
+          # List releases newest-first, dropping drafts and the auto-created
+          # "Latest <channel>" mirror releases, so install.sh is only ever
+          # synced from real releases and never from a "latest" mirror.
+          gh release list --limit 200 --json tagName,name,createdAt,isDraft \
+            --jq 'map(select((.isDraft | not) and ((.name // "") | startswith("Latest") | not)))
+                  | sort_by(.createdAt) | reverse | .[].tagName' > tags.txt
+
+          # Pick the newest real tag that belongs to the given channel.
+          # rc releases are served through the beta channel.
+          pick_tag() {
+            channel="$1"
+            while IFS= read -r tag; do
+              case "$tag" in
+                *nightly*)   tag_channel=nightly ;;
+                *beta*|*rc*) tag_channel=beta ;;
+                *)           tag_channel=release ;;
+              esac
+              if [ "$tag_channel" = "$channel" ]; then
+                printf '%s' "$tag"
+                return 0
+              fi
+            done < tags.txt
+          }
+
           for channel in nightly beta release; do
-            TAG_NAME=$(git tag -l --sort -creatordate | grep -F "${channel}" | head -n1 || true)
+            TAG_NAME="$(pick_tag "$channel")"
             if [ -n "${TAG_NAME}" ]; then
-              curl -fsSL "https://github.com/AdguardTeam/AdGuardVPNCLI/releases/download/${TAG_NAME}/install.sh" -o "scripts/${channel}/install.sh"
+              gh release download "${TAG_NAME}" \
+                --pattern install.sh \
+                --dir "scripts/${channel}" \
+                --clobber
               git add "scripts/${channel}/install.sh"
             fi
           done
+
           if ! git diff-index --cached --quiet HEAD; then
             git commit -m "Update install.sh"
             git push origin HEAD
