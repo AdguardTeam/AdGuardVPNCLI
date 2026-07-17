@@ -130,6 +130,22 @@ set_os() {
   log "Operating system: $os"
 }
 
+# Function check_macos_version refuses to install or update on macOS versions older
+# than the minimum the binary supports (macOS 11.0, Big Sur). Big Sur reports either
+# "11.x" or, in compatibility mode, "10.16", so 10.16 is the lowest accepted version.
+check_macos_version() {
+  [ "$os" = 'macos' ] || return 0
+
+  macos_version="$( sw_vers -productVersion 2>/dev/null )"
+  # If the version can't be determined, don't block the installation.
+  [ -n "$macos_version" ] || return 0
+
+  if version_lt "$macos_version" '10.16'
+  then
+    error_exit "AdGuard VPN CLI requires macOS 11.0 (Big Sur) or newer, but macOS ${macos_version} was detected."
+  fi
+}
+
 # Function set_cpu sets the cpu if needed and validates the value.
 set_cpu() {
   # For macOS there is universal binary, so we don't need to set cpu
@@ -477,6 +493,24 @@ apply_version() {
   pkg_name=$(echo "${pkg_name}" | sed -E "s/${exe_name}/${exe_name}-${version}/")
 }
 
+# version_lt returns success (0) if the first version is strictly lower than the second.
+# Both arguments are expected in major.minor.patch form; missing parts default to 0.
+version_lt() {
+  a_major=$(echo "$1" | sed -nE 's/^([0-9]+).*$/\1/p'); [ -z "$a_major" ] && a_major=0
+  a_minor=$(echo "$1" | sed -nE 's/^[0-9]+\.([0-9]+).*$/\1/p'); [ -z "$a_minor" ] && a_minor=0
+  a_patch=$(echo "$1" | sed -nE 's/^[0-9]+\.[0-9]+\.([0-9]+).*$/\1/p'); [ -z "$a_patch" ] && a_patch=0
+  b_major=$(echo "$2" | sed -nE 's/^([0-9]+).*$/\1/p'); [ -z "$b_major" ] && b_major=0
+  b_minor=$(echo "$2" | sed -nE 's/^[0-9]+\.([0-9]+).*$/\1/p'); [ -z "$b_minor" ] && b_minor=0
+  b_patch=$(echo "$2" | sed -nE 's/^[0-9]+\.[0-9]+\.([0-9]+).*$/\1/p'); [ -z "$b_patch" ] && b_patch=0
+
+  [ "$a_major" -lt "$b_major" ] && return 0
+  [ "$a_major" -gt "$b_major" ] && return 1
+  [ "$a_minor" -lt "$b_minor" ] && return 0
+  [ "$a_minor" -gt "$b_minor" ] && return 1
+  [ "$a_patch" -lt "$b_patch" ] && return 0
+  return 1
+}
+
 # Main function.
 configure() {
   if [ "$uninstall" -eq '1' ]
@@ -489,6 +523,10 @@ configure() {
 
   set_is_root
   set_os
+  if [ "$uninstall" -ne '1' ]
+  then
+    check_macos_version
+  fi
   set_cpu
   check_out_dir
 
@@ -509,7 +547,14 @@ configure() {
     pkg_name="${exe_name}-${os}-${cpu}.${pkg_ext}"
   fi
   apply_version
-  url="https://github.com/AdguardTeam/AdGuardVPNCLI/releases/download/v${version}-${channel}/${pkg_name}"
+  # Releases before 1.8.0 use the v${version}-${channel} tag format.
+  if version_lt "$version" '1.8.0'
+  then
+    release_tag="v${version}-${channel}"
+  else
+    release_tag="v${version}"
+  fi
+  url="https://github.com/AdguardTeam/AdGuardVPNCLI/releases/download/${release_tag}/${pkg_name}"
 
   readonly output_dir url pkg_name
 
@@ -764,7 +809,7 @@ channel='nightly'
 verbose='1'
 cpu=''
 os=''
-version='1.7.18'
+version='1.8.1-nightly.1'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
