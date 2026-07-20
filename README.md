@@ -224,3 +224,11 @@ Control site exclusions with the following subcommands:
 - `show`: Show all exclusions.
 - `clear`: Clear all exclusions.
 - `mode`: Set VPN exclusion mode (general/selective) or show the current mode if no options are passed.
+
+## Projects that use AdGuard VPN CLI
+
+Please note that these projects are not affiliated with AdGuard, but are made by third-party developers and fans.
+
+- [adguardvpn-gui](https://github.com/SpazzRabbit/adguardvpn-gui): unofficial modern desktop GUI for the official CLI, by [@SpazzRabbit](https://github.com/SpazzRabbit).
+- [DMS AdGuard VPN Plugin](https://github.com/bernardopg/dms-adguard-vpn-plugin): DankMaterialShell plugin for controlling AdGuard VPN CLI from the desktop bar, by [@bernardopg](https://github.com/bernardopg).
+- [Docker images for AdGuard VPN CLI](https://github.com/supersunho/docker-adguardvpn-cli): multi-arch (amd64/arm64/armv7) builds with CI/CD, by [@supersunho](https://github.com/supersunho).
