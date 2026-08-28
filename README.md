@@ -233,3 +233,4 @@ Please note that these projects are not affiliated with AdGuard, but are made by
 - [DMS AdGuard VPN Plugin](https://github.com/bernardopg/dms-adguard-vpn-plugin): DankMaterialShell plugin for controlling AdGuard VPN CLI from the desktop bar, by [@bernardopg](https://github.com/bernardopg).
 - [Docker images for AdGuard VPN CLI](https://github.com/supersunho/docker-adguardvpn-cli): multi-arch (amd64/arm64/armv7) builds with CI/CD, by [@supersunho](https://github.com/supersunho).
 - [adguardvpn-cli-gui](https://github.com/pablo-chitaksa/adguardvpn-cli-gui): simple Tkinter-based desktop GUI for the official CLI, by [@pablo-chitaksa](https://github.com/pablo-chitaksa).
+- [Vantah](https://github.com/bolikcraft/vantah): unofficial desktop and system-tray GUI for the official CLI, built with C#/.NET and Avalonia, by [@bolikcraft](https://github.com/bolikcraft).
