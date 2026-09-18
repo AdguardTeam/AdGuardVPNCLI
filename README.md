@@ -35,6 +35,8 @@ AdGuard VPN CLI provides a command-line interface for managing VPN connection.
 
 ## Installation
 
+### Installation script
+
 To install the latest version of AdGuard VPN CLI, run the following command:
 
 Release channel:
@@ -57,6 +59,28 @@ curl -fsSL https://raw.githubusercontent.com/AdguardTeam/AdGuardVPNCLI/HEAD/scri
 
 > [!NOTE]
 > You can also install and run the AdGuard VPN CLI Docker container on MikroTik routers with RouterOS. For more information and detailed instructions, refer to our [dedicated guide](https://adguard-vpn.com/kb/adguard-vpn-for-linux/setting-up-on-a-router/mikrotik/).
+
+### macOS (Homebrew)
+
+The easiest way to install AdGuard VPN CLI on macOS is via our [Homebrew tap](https://github.com/AdguardTeam/homebrew-tap):
+
+```shell
+brew install AdguardTeam/tap/adguardvpn-cli
+```
+
+This installs a prebuilt binary of the latest release along with shell completions. To update it later:
+
+```shell
+brew upgrade adguardvpn-cli
+```
+
+To uninstall:
+
+```shell
+brew uninstall adguardvpn-cli
+```
+
+> The Homebrew formula tracks the release channel only. For beta or nightly builds, use the installation script.
 
 ## Verify Releases
 
