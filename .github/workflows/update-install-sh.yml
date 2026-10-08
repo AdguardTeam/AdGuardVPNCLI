@@ -48,17 +48,23 @@ jobs:
           }
 
           for channel in nightly beta release; do
+            case "${channel}" in
+              release) BADGE_COLOR='blue' ;;
+              *)       BADGE_COLOR='orange' ;;
+            esac
             TAG_NAME="$(pick_tag "$channel")"
             if [ -n "${TAG_NAME}" ]; then
               gh release download "${TAG_NAME}" \
                 --pattern install.sh \
                 --dir "scripts/${channel}" \
                 --clobber
-              git add "scripts/${channel}/install.sh"
+              printf '{"schemaVersion":1,"label":"%s","message":"%s","color":"%s"}\n' \
+                "${channel}" "${TAG_NAME}" "${BADGE_COLOR}" > "scripts/${channel}/badge.json"
+              git add "scripts/${channel}/install.sh" "scripts/${channel}/badge.json"
             fi
           done
 
           if ! git diff-index --cached --quiet HEAD; then
-            git commit -m "Update install.sh"
+            git commit -m "Update install.sh and badge.json"
             git push origin HEAD
           fi
