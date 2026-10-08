@@ -50,6 +50,7 @@ jobs:
           for channel in nightly beta release; do
             case "${channel}" in
               release) BADGE_COLOR='blue' ;;
+              nightly) BADGE_COLOR='8B5CF6' ;;
               *)       BADGE_COLOR='orange' ;;
             esac
             TAG_NAME="$(pick_tag "$channel")"
