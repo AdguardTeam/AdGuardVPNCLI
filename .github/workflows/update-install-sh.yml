@@ -31,19 +31,22 @@ jobs:
                   | sort_by(.createdAt) | reverse | .[].tagName' > tags.txt
 
           # Pick the newest real tag that belongs to the given channel.
-          # rc releases are served through the beta channel.
+          # rc releases are served through the beta channel. Stable releases
+          # are served through both the release and the beta channels.
           pick_tag() {
             channel="$1"
             while IFS= read -r tag; do
               case "$tag" in
-                *nightly*)   tag_channel=nightly ;;
-                *beta*|*rc*) tag_channel=beta ;;
-                *)           tag_channel=release ;;
+                *nightly*)   tag_channels='nightly' ;;
+                *beta*|*rc*) tag_channels='beta' ;;
+                *)           tag_channels='release beta' ;;
               esac
-              if [ "$tag_channel" = "$channel" ]; then
-                printf '%s' "$tag"
-                return 0
-              fi
+              for tag_channel in $tag_channels; do
+                if [ "$tag_channel" = "$channel" ]; then
+                  printf '%s' "$tag"
+                  return 0
+                fi
+              done
             done < tags.txt
           }
 
@@ -59,6 +62,9 @@ jobs:
                 --pattern install.sh \
                 --dir "scripts/${channel}" \
                 --clobber
+              # A stable release install.sh can be served through the beta
+              # channel, so set the channel to the one it is served through.
+              sed -i "s/^channel='[a-z]*'$/channel='${channel}'/" "scripts/${channel}/install.sh"
               printf '{"schemaVersion":1,"label":"%s","message":"%s","color":"%s"}\n' \
                 "${channel}" "${TAG_NAME}" "${BADGE_COLOR}" > "scripts/${channel}/badge.json"
               git add "scripts/${channel}/install.sh" "scripts/${channel}/badge.json"
