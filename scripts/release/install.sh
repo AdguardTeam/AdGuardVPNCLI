@@ -24,6 +24,7 @@ error_exit() {
 # Function usage prints the note about how to use the script.
 usage() {
   echo 'Usage: install.sh [-o output_dir] [-v] [-h] [-u] [-p archive_path] [-a y|n]' 1>&2
+  echo "On Linux, an installation into a system binary directory puts the files in '/opt/adguardvpn_cli' and creates a symlink in the requested directory." 1>&2
 }
 
 # Function parse_opts parses the options list and validates it's combinations.
@@ -248,6 +249,104 @@ is_dir_owned_by_current_user() {
   fi
 }
 
+# Function resolve_symlinks prints the passed path as an absolute path with all the
+# symlinks resolved, like `readlink -f` does.
+# Plain `readlink` is used instead of `readlink -f`, which is not available on
+# macOS older than 12.3, while the script supports macOS 11.0 and newer.
+resolve_symlinks() {
+  target="$1"
+  # The caller may install into a relative directory, but a symlink target has to be
+  # absolute to stay valid regardless of the location of the link.
+  case "$target"
+  in
+  /*)
+    ;;
+  *)
+    target="$(pwd -P)/${target}"
+    ;;
+  esac
+  # The hop limit only breaks symlink cycles: the kernel itself refuses to follow more
+  # than MAXSYMLINKS links (40 on Linux, 32 on macOS), so longer chains are unresolvable.
+  hops='0'
+  while [ -L "$target" ] && [ "$hops" -lt '40' ]
+  do
+    link="$(readlink "$target")" || break
+    case "$link"
+    in
+    /*)
+      target="$link"
+      ;;
+    *)
+      target="$(dirname "$target")/${link}"
+      ;;
+    esac
+    hops=$((hops + 1))
+  done
+  printf '%s\n' "$target"
+}
+
+# Function canonical_dir prints the passed directory as an absolute path with the
+# symlinks resolved in all its components, or the path itself if it cannot be entered.
+canonical_dir() {
+  ( cd "$1" 2> /dev/null && pwd -P ) || printf '%s\n' "$1"
+}
+
+# Function same_file checks that both paths refer to the same file.
+same_file() {
+  [ -e "$1" ] && [ -e "$2" ] && [ "$1" -ef "$2" ]
+}
+
+# Function path_entries prints the full paths of all `adguardvpn-cli` executables
+# found in $PATH.
+path_entries() {
+  old_ifs="$IFS"
+  IFS='
+'
+  for dir in $(printf '%s\n' "$PATH" | tr ':' '\n')
+  do
+    if [ -n "$dir" ] && { [ -f "${dir}/${bin_file_name}" ] || [ -L "${dir}/${bin_file_name}" ]; }
+    then
+      printf '%s\n' "${dir}/${bin_file_name}"
+    fi
+  done
+  IFS="$old_ifs"
+}
+
+# Function find_existing_install_dirs prints the directories of all AdGuard VPN CLI
+# installations found in $PATH, one per line, in $PATH order and without duplicates
+# (the same installation may be reachable through several $PATH entries).
+find_existing_install_dirs() {
+  path_entries | while IFS= read -r entry
+  do
+    resolved="$(resolve_symlinks "$entry")"
+    dir="${resolved%/*}"
+    [ "$dir" != "$resolved" ] || dir='.'
+
+    if [ -f "${dir}/bash-completion.sh" ]
+    then
+      canonical_dir "$dir"
+    fi
+  done | awk '!seen[$0]++'
+
+  return 0
+}
+
+# Function warn_about_another_installation warns about every CLI installation found
+# in $PATH that lives in a directory other than the one being installed into, so that
+# installing next to existing installations does not go unnoticed.
+warn_about_another_installation() {
+  current_dir="$(canonical_dir "$output_dir")"
+  find_existing_install_dirs | while IFS= read -r detected_dir
+  do
+    if [ "$detected_dir" != "$current_dir" ]
+    then
+      echo "WARNING: detected installation path '$detected_dir' differs from current installation path '$output_dir'" 1>&2
+    fi
+  done
+
+  return 0
+}
+
 # Function create_dir creates the output directory if it does not exist.
 create_dir() {
   mkdir -p "$output_dir" 2>/dev/null
@@ -279,7 +378,7 @@ check_owner() {
     log "'$output_dir' exists and is owned by '$USER'"
   else
     log "'$output_dir' exists but is not owned by '$USER'"
-    ask_user "Would you like to change the ownership of $output_dir to $USER? [y/N] "
+    ask_user "Would you like to change the ownership of $output_dir to $USER (so no sudo is needed for the following steps)? [y/N] "
     case "$response" in
     [yY]|[yY][eE][sS])
       target_user="${SUDO_USER:-$USER}"
@@ -294,6 +393,32 @@ check_owner() {
       ;;
     esac
   fi
+}
+
+# Function is_listed_system_bin_dir checks whether the path matches one of the
+# known system binary directories without resolving it.
+is_listed_system_bin_dir() {
+  bin_dir="$1"
+  while [ "${bin_dir%/}" != "$bin_dir" ]
+  do
+    bin_dir="${bin_dir%/}"
+  done
+  for sys_dir in $system_bin_dirs
+  do
+    if [ "$bin_dir" = "$sys_dir" ]
+    then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Function is_system_bin_dir checks whether the directory is a system binary directory.
+is_system_bin_dir() {
+  [ "$os" = 'linux' ] || return 1
+  is_listed_system_bin_dir "$1" && return 0
+  bin_dir_resolved="$(cd "$1" 2>/dev/null && pwd -P)" || return 1
+  is_listed_system_bin_dir "$bin_dir_resolved"
 }
 
 # Function check_out_dir requires the output directory to be set and exist.
@@ -312,11 +437,37 @@ check_out_dir() {
 
   if [ "$uninstall" -eq '1' ]
   then
+    # Follow the symlink to the /opt installation when uninstalling from a system directory.
+    if is_system_bin_dir "$output_dir" && \
+        [ "$(readlink "${output_dir}/${bin_file_name}" 2>/dev/null)" = "/opt/adguardvpn_cli/${bin_file_name}" ]
+    then
+      link_dir="$output_dir"
+      output_dir='/opt/adguardvpn_cli'
+    fi
     echo "AdGuard VPN will be uninstalled from '$output_dir'"
     return 0
-  else
-    echo "AdGuard VPN will be installed to '$output_dir'"
   fi
+
+  # A missing system binary directory is most likely a typo.  Refuse it before
+  # downloading, otherwise the installation would bypass the /opt redirect.
+  if [ "$os" = 'linux' ] && is_listed_system_bin_dir "$output_dir" && [ ! -d "$output_dir" ]
+  then
+    error_exit "System binary directory '$output_dir' does not exist. Please specify an existing installation directory"
+  fi
+
+  # Install into /opt when the target is a system binary directory and keep a
+  # symlink in the original directory.
+  if is_system_bin_dir "$output_dir"
+  then
+    link_dir="$output_dir"
+    output_dir='/opt/adguardvpn_cli'
+  fi
+
+  echo "AdGuard VPN will be installed to '$output_dir'"
+
+  # Compare against the directory the installer will actually use, which may
+  # differ from the requested one after the system-directory redirect above.
+  warn_about_another_installation
 
   set +e
   # Check if directory exists
@@ -334,16 +485,30 @@ check_out_dir() {
 # Function verify_hint prints a hint about how to verify the installation.
 verify_hint() {
   # Check if `.sig` file exists
-  if [ -f "${output_dir}/${exe_name}.sig" ]
+  if [ -f "${output_dir}/${bin_file_name}.sig" ]
   then
     echo
     echo "To verify the installation, run the following command to import the public key and verify the signature:"
     echo "    gpg --keyserver 'keys.openpgp.org' --recv-key '28645AC9776EC4C00BCE2AFC0FE641E7235E2EC6'"
-    echo "    gpg --verify ${output_dir}/${exe_name}.sig ${output_dir}/${exe_name}"
+    echo "    gpg --verify ${output_dir}/${bin_file_name}.sig ${output_dir}/${bin_file_name}"
   fi
 }
 
 create_symlink() {
+  # The installation was redirected from a system directory; link there.
+  if [ -n "$link_dir" ]
+  then
+    if [ "$is_root" -eq 1 ] || [ -w "$link_dir" ]; then
+      ln -sf "${output_dir}/${bin_file_name}" "${link_dir}/${bin_file_name}"
+    else
+      sudo ln -sf "${output_dir}/${bin_file_name}" "${link_dir}/${bin_file_name}"
+    fi || error_exit "Failed to create symlink in '${link_dir}'"
+    symlink_exists='1'
+    echo "Binary has been linked to '${link_dir}/${bin_file_name}'"
+    return 0
+  fi
+
+  # ask in case of ordinary user installation not in a system binary directory
   case "$PATH" in
   */usr/local/bin*)
     ;;
@@ -352,8 +517,8 @@ create_symlink() {
     ;;
   esac
   # Check for existing symlink or .nosymlink file
-  if [ -L "/usr/local/bin/${exe_name}" ] && \
-      [ "$(readlink -f "/usr/local/bin/${exe_name}")" = "$(readlink -f "${output_dir}/${exe_name}")" ]; then
+  if [ -L "/usr/local/bin/${bin_file_name}" ] && \
+      same_file "/usr/local/bin/${bin_file_name}" "${output_dir}/${bin_file_name}"; then
     symlink_exists='1'
   fi
 
@@ -367,7 +532,7 @@ create_symlink() {
     case "$response" in
     [yY]|[yY][eE][sS])
       # Create a symlink with an absolute path
-      absolute_path=$(readlink -f "${output_dir}/${exe_name}")
+      absolute_path="$(resolve_symlinks "${output_dir}/${bin_file_name}")"
       if ln -sf "${absolute_path}" /usr/local/bin/ 2> /dev/null || [ "$is_root" -eq 0 ] && sudo ln -sf "${absolute_path}" /usr/local/bin/; then
         symlink_exists='1'
         log "Binary has been linked to '/usr/local/bin'"
@@ -402,8 +567,14 @@ unpack() {
     error_exit "Cannot create directory '$output_dir'"
   fi
 
-  if ! tar -C "$output_dir" -f "$pkg_name" -x -z
+  # Extract into a staging directory first, so a failed unpack does not destroy
+  # the current installation. The trap covers an interrupted move as well.
+  staging_dir="${output_dir}/.install"
+  trap 'rm -rf "${output_dir}/.install"' EXIT
+  rm -rf "$staging_dir"
+  if ! mkdir -p "$staging_dir" || ! tar -C "$staging_dir" -f "$pkg_name" -x -z
   then
+    rm -rf "$staging_dir"
     remove_downloaded_package
     error_exit "Cannot unpack '$pkg_name'"
   fi
@@ -411,28 +582,36 @@ unpack() {
   remove_downloaded_package
   log "Package has been unpacked successfully"
 
+  # The archive layout is not part of the contract, so check what was actually
+  # extracted instead of trusting the file name.
   base_name=$(echo "$pkg_name" | sed -E 's!.*/!!')
   dir_name=$(echo "${base_name}" | sed -E -e 's/(.*)(\.tar\.gz|\.zip)/\1/')
-#  dir_name=$(echo "${pkg_name}" | sed -E -e 's/(.*)(\.tar\.gz|\.zip)/\1/')
-  if [ -z "${dir_name}" ]; then
-    error_exit "Can not determine directory name inside archive"
+  if [ -f "${staging_dir}/${dir_name}/${bin_file_name}" ]; then
+    unpack_dir="${staging_dir}/${dir_name}"
+  elif [ -f "${staging_dir}/${bin_file_name}" ]; then
+    unpack_dir="$staging_dir"
+  else
+    error_exit "Unexpected archive layout in '$pkg_name'"
   fi
+
+  # Replace the current installation only after the new payload is checked.
+  if [ -f "${output_dir}/${bin_file_name}" ]
+  then
+    remove_existing
+  fi
+  if [ -n "$legacy_dir" ]
+  then
+    remove_legacy_files
+  fi
+
   if type mv > /dev/null 2>&1; then
-    mv -f "${output_dir}/${dir_name}/"* "${output_dir}"
+    mv -f "${unpack_dir}/"* "${output_dir}" || error_exit "Cannot move files from '${unpack_dir}'"
   elif type ln > /dev/null 2>&1; then
-    ln -f "${output_dir}/${dir_name}/"* "${output_dir}"
-    rm -f "${output_dir}/${dir_name}/"*
+    ln -f "${unpack_dir}/"* "${output_dir}" || error_exit "Cannot move files from '${unpack_dir}'"
   else
     error_exit "You need mv or ln for this script to work. Make sure that \"coreutils-mv\" is installed."
   fi
-  if type rmdir > /dev/null 2>&1; then
-    rmdir "${output_dir}/${dir_name}"
-  else
-    if [ "$(echo "${output_dir}/${dir_name}/"*)" != "${output_dir}/${dir_name}/*" ]; then
-      error_exit "Directory not empty"
-    fi
-    rm -rf "${output_dir:?}/${dir_name:?}"
-  fi
+  rm -rf "$staging_dir"
 }
 
 # Function unpack unpacks the passed archive depending on it's extension.
@@ -490,7 +669,7 @@ apply_version() {
     return 0
   fi
 
-  pkg_name=$(echo "${pkg_name}" | sed -E "s/${exe_name}/${exe_name}-${version}/")
+  pkg_name=$(echo "${pkg_name}" | sed -E "s/${bin_file_name}/${bin_file_name}-${version}/")
 }
 
 # version_lt returns success (0) if the first version is strictly lower than the second.
@@ -542,9 +721,9 @@ configure() {
 
   if [ "$os" = 'macos' ]
   then
-    pkg_name="${exe_name}-macos.${pkg_ext}"
+    pkg_name="${bin_file_name}-macos.${pkg_ext}"
   else
-    pkg_name="${exe_name}-${os}-${cpu}.${pkg_ext}"
+    pkg_name="${bin_file_name}-${os}-${cpu}.${pkg_ext}"
   fi
   apply_version
   # Releases before 1.8.0 use the v${version}-${channel} tag format.
@@ -568,19 +747,26 @@ configure() {
 # Function handle_uninstall removes the existing package from the output directory.
 handle_uninstall() {
   # Check if the package is present in the output directory.
-  if [ ! -f "${output_dir}/${exe_name}" ]
+  if [ ! -f "${output_dir}/${bin_file_name}" ]
   then
     error_exit "AdGuard VPN is not installed in '${output_dir}'. Please specify the correct installation directory"
   fi
 
   # Check if vpn is running
-  if pgrep -x "${exe_name}" > /dev/null
+  if pgrep -x "${bin_file_name}" > /dev/null
   then
     log 'AdGuard VPN is running. Stopping it...'
-    "${output_dir}/${exe_name}" disconnect
+    "${output_dir}/${bin_file_name}" disconnect
   fi
 
+  binary_path="$(readlink -f "${output_dir}/${bin_file_name}" 2>/dev/null)" ||
+    binary_path="${output_dir}/${bin_file_name}"
+
   remove_existing
+
+  # A staging directory left by an interrupted update would keep the install
+  # directory from being removed below.
+  rm -rf "${output_dir}/.install"
 
   # Check if the directory is empty
   if [ -z "$(ls -A "${output_dir}")" ]
@@ -606,39 +792,39 @@ handle_uninstall() {
     set -e
   fi
 
-  # Check symlink in /usr/local/bin
-  if [ -L "/usr/local/bin/${exe_name}" ]
-  then
-    set +e
-    log "Remove symlink from '/usr/local/bin'"
-    rm -f "/usr/local/bin/${exe_name}" 2> /dev/null
-    # Check success
-    if [ $? -eq 1 ];
+  # Remove the symlink created by the installer, if any.
+  for dir in $system_bin_dirs
+  do
+    [ -L "${dir}/${bin_file_name}" ] || continue
+    link_target="$(readlink "${dir}/${bin_file_name}")"
+    if [ "$link_target" = "${output_dir}/${bin_file_name}" ] || [ "$link_target" = "$binary_path" ]
     then
-      if [ "$is_root" -eq 0 ]; then
-        echo "Starting sudo to remove '/usr/local/bin/${exe_name}'"
-        if sudo rm -f "/usr/local/bin/${exe_name}"; then
-          log "Symlink has been removed from '/usr/local/bin'"
-        else
-          log "Failed to remove symlink from '/usr/local/bin' with sudo"
-        fi
+      log "Remove symlink from '${dir}'"
+      if [ "$is_root" -eq 1 ] || [ -w "$dir" ]; then
+        rm -f "${dir}/${bin_file_name}"
       else
-        log "Failed to remove symlink from '/usr/local/bin'"
-      fi
-    else
-      log "Symlink has been removed from '/usr/local/bin'"
+        echo "Starting sudo to remove '${dir}/${bin_file_name}'"
+        sudo rm -f "${dir}/${bin_file_name}"
+      fi || {
+        echo "Failed to remove symlink from '${dir}'" 1>&2
+        symlink_removal_failed='1'
+      }
     fi
-    set -e
-  fi
+  done
 
   # Notify about service files
   echo "Service files are not removed. You can remove them manually if needed from: "
   if [ $os = 'linux' ]
   then
-    echo "    '${XDG_DATA_HOME:-~/.local/share}/${exe_name}'"
+    echo "    '${XDG_DATA_HOME:-~/.local/share}/${bin_file_name}'"
   elif [ $os = 'macos' ]
   then
-    echo "    '~/Library/Application Support/${exe_name}'"
+    echo "    '~/Library/Application Support/${bin_file_name}'"
+  fi
+
+  if [ "$symlink_removal_failed" -eq '1' ]
+  then
+    error_exit 'AdGuard VPN has been uninstalled, but its symlink could not be removed'
   fi
 
   echo 'AdGuard VPN has been uninstalled successfully'
@@ -648,16 +834,32 @@ handle_uninstall() {
 remove_existing() {
   log 'Removing existing package...'
   # Remove executable file
-  rm -f "${output_dir}/${exe_name}"
-  log "'${exe_name}' has been removed from '${output_dir}'"
+  rm -f "${output_dir}/${bin_file_name}"
+  log "'${bin_file_name}' has been removed from '${output_dir}'"
   # Remove .sig file
-  rm -f "${output_dir}/${exe_name}.sig"
-  log "'${exe_name}.sig' has been removed from '${output_dir}'"
+  rm -f "${output_dir}/${bin_file_name}.sig"
+  log "'${bin_file_name}.sig' has been removed from '${output_dir}'"
   # Remove bash-completion.sh
   rm -f "${output_dir}/bash-completion.sh"
   log "'bash-completion.sh' has been removed from '${output_dir}'"
   # Remove .nosymlink file
   rm -f "${output_dir}/.nosymlink"
+}
+
+# Function remove_legacy_files removes the files left in a system binary
+# directory by a previous installation into that directory.  The binary itself
+# is replaced with a symlink later.
+remove_legacy_files() {
+  set -- \
+    "${legacy_dir}/${bin_file_name}.sig" \
+    "${legacy_dir}/bash-completion.sh" \
+    "${legacy_dir}/.nosymlink"
+
+  if [ "$is_root" -eq 1 ] || [ -w "$legacy_dir" ]; then
+    rm -f "$@"
+  else
+    sudo rm -f "$@"
+  fi || echo "Warning: failed to remove files of the previous installation from '${legacy_dir}'" 1>&2
 }
 
 # Function checks if the package is already present in the output directory.
@@ -668,27 +870,32 @@ handle_existing() {
     exit 0
   fi
 
-  if [ ! -f "${output_dir}/${exe_name}" ]
+  # A previous version could be installed directly into a system binary
+  # directory, before such installations were redirected to /opt.
+  if [ -n "$link_dir" ] && [ -f "${link_dir}/${bin_file_name}" ] && [ ! -L "${link_dir}/${bin_file_name}" ]
+  then
+    legacy_dir="$link_dir"
+  fi
+
+  if [ ! -f "${output_dir}/${bin_file_name}" ] && [ -z "$legacy_dir" ]
   then
     return
   fi
 
-  log "Package ${exe_name} is already present in '${output_dir}'"
+  log "Package ${bin_file_name} is already present in '${legacy_dir:-$output_dir}'"
   PIDFILE=
   # Check if vpn is running
   if [ $os = 'linux' ]
   then
-    PIDFILE="${XDG_DATA_HOME:-$HOME/.local/share}/${exe_name}/vpn.pid"
+    PIDFILE="${XDG_DATA_HOME:-$HOME/.local/share}/${bin_file_name}/vpn.pid"
   elif [ $os = 'macos' ]
   then
-    PIDFILE="$HOME/Library/Application Support/${exe_name}/vpn.pid"
+    PIDFILE="$HOME/Library/Application Support/${bin_file_name}/vpn.pid"
   fi
   if [ -f "$PIDFILE" ] && pgrep -F "$PIDFILE" > /dev/null
   then
     error_exit "AdGuard VPN is running. Please, stop it before installing"
   fi
-
-  remove_existing
 }
 
 # Function download downloads the package from the url.
@@ -743,9 +950,9 @@ report_success() {
   echo "You can use it by running command:"
   if [ "$symlink_exists" -eq '1' ]
   then
-    echo "    ${exe_name} --help"
+    echo "    ${bin_file_name} --help"
   else
-    echo "    ${output_dir}/${exe_name} --help"
+    echo "    ${output_dir}/${bin_file_name} --help"
   fi
 
   echo
@@ -770,7 +977,7 @@ post_install() {
       src="$archive_path"
     fi
     if [ -n "$src" ]; then
-      version=$(echo "$src" | sed -nE "s@.*${exe_name}-([0-9]+\.[0-9]+\.[0-9]+).*@\\1@p")
+      version=$(echo "$src" | sed -nE "s@.*${bin_file_name}-([0-9]+\.[0-9]+\.[0-9]+).*@\\1@p")
     fi
   fi
   min_major=1
@@ -795,7 +1002,7 @@ post_install() {
   [Yy]) args="-y" ;;
   [Nn]) args="-n" ;;
   esac
-  if ! "${output_dir}/${exe_name}" post_install $args; then
+  if ! "${output_dir}/${bin_file_name}" post_install $args; then
     echo "Post-installation step failed"
     exit 1
   fi
@@ -803,16 +1010,20 @@ post_install() {
 
 # Entrypoint
 
-exe_name='adguardvpn-cli'
+bin_file_name='adguardvpn-cli'
+system_bin_dirs='/bin /sbin /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin'
 output_dir=''
 channel='release'
 verbose='1'
 cpu=''
 os=''
-version='1.8.2'
+version='1.8.3'
 uninstall='0'
 remove_command="rm -f"
 symlink_exists='0'
+link_dir=''
+legacy_dir=''
+symlink_removal_failed='0'
 is_root='0'
 archive_path=''
 auto_answer=''
